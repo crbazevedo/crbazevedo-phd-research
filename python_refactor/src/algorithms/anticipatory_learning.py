@@ -1,12 +1,13 @@
 """
-Anticipatory Learning Module
+Enhanced Anticipatory Learning Module
 
-Enhanced implementation to include:
-- Anticipative distribution concept
-- Adaptive learning rate with Kalman error and entropy
-- 1-step ahead horizon for predictive decisions
-- Predicted portfolio rebalancing for maximal expected hypervolume
-- Stochastic Pareto frontier storage for visualization
+Fully aligned with C++ ASMS-EMOA implementation including:
+- Correct anticipatory learning rate formula
+- Dirichlet mean prediction for decision space learning
+- Historical population tracking
+- Epsilon feasibility constraints
+- Transaction cost integration
+- Separate objective space and decision space learning
 """
 
 import numpy as np
@@ -55,13 +56,70 @@ class AnticipativeDistribution:
         det = np.linalg.det(self.anticipative_covariance[:2, :2])  # ROI and risk only
         return 1.0 / (1.0 + det)
 
-class AnticipatoryLearning:
-    """Enhanced anticipatory learning system with adaptive learning rate and 1-step ahead horizon."""
+class DirichletPredictor:
+    """Dirichlet-based prediction for portfolio weights."""
     
-    def __init__(self, learning_rate: float = 0.01, prediction_horizon: int = 1,  # Changed to 1-step ahead
+    @staticmethod
+    def dirichlet_mean_prediction_vec(prev_proportions: np.ndarray, current_proportions: np.ndarray, 
+                                    anticipative_rate: float) -> np.ndarray:
+        """
+        Predict portfolio weights using Dirichlet mean prediction.
+        
+        Args:
+            prev_proportions: Previous portfolio weights
+            current_proportions: Current portfolio weights
+            anticipative_rate: Anticipatory learning rate
+            
+        Returns:
+            Predicted portfolio weights
+        """
+        anticipative_rate = 0.5 * anticipative_rate
+        prediction = prev_proportions + anticipative_rate * (current_proportions - prev_proportions)
+        
+        # Normalize and ensure bounds
+        prediction = np.maximum(prediction, 0.0)
+        prediction = np.minimum(prediction, 1.0)
+        
+        return prediction / np.sum(prediction)
+    
+    @staticmethod
+    def dirichlet_mean_map_update(p_predicted: np.ndarray, p_obs: np.ndarray, 
+                                concentration: float) -> np.ndarray:
+        """
+        Update portfolio weights using Dirichlet MAP estimation.
+        
+        Args:
+            p_predicted: Predicted portfolio weights
+            p_obs: Observed portfolio weights
+            concentration: Concentration parameter
+            
+        Returns:
+            Updated portfolio weights
+        """
+        # Compute Dirichlet variance
+        alpha = concentration * p_predicted
+        alpha_sum = np.sum(alpha)
+        factor = alpha_sum**3 + alpha_sum**2
+        alpha_square = alpha**2
+        var = (alpha_sum * alpha - alpha_square) / factor
+        
+        # MAP update
+        p_updated = np.zeros_like(p_predicted)
+        for i in range(len(p_predicted)):
+            if p_predicted[i] == 0.0 or var[i] == 0.0:
+                p_updated[i] = 0.0
+            else:
+                p_updated[i] = p_predicted[i] + var[i] * (p_obs[i] - p_predicted[i]) / (p_predicted[i] * (1 - p_predicted[i]))
+        
+        return p_updated / np.sum(p_updated)
+
+class AnticipatoryLearning:
+    """Enhanced anticipatory learning system aligned with C++ ASMS-EMOA implementation."""
+    
+    def __init__(self, learning_rate: float = 0.01, prediction_horizon: int = 1,
                  monte_carlo_simulations: int = 1000, state_observation_frequency: int = 10,
                  error_threshold: float = 0.05, learning_type: str = "single_solution",
-                 adaptive_learning: bool = True):
+                 adaptive_learning: bool = True, window_size: int = 20):
         """
         Initialize enhanced anticipatory learning system.
         
@@ -73,6 +131,7 @@ class AnticipatoryLearning:
             error_threshold: Threshold for prediction error
             learning_type: Type of learning ("single_solution" or "population")
             adaptive_learning: Whether to use adaptive learning rate
+            window_size: Kalman filter window size
         """
         self.base_learning_rate = learning_rate
         self.prediction_horizon = prediction_horizon
@@ -81,9 +140,15 @@ class AnticipatoryLearning:
         self.error_threshold = error_threshold
         self.learning_type = learning_type
         self.adaptive_learning = adaptive_learning
+        self.window_size = window_size
         
         # Kalman filter for state tracking
         self.kalman_filter = KalmanFilter()
+        
+        # Historical tracking (aligned with C++ implementation)
+        self.historical_populations = []
+        self.historical_anticipative_decisions = []
+        self.predicted_anticipative_decision = None
         
         # Learning history
         self.learning_history = []
@@ -98,6 +163,373 @@ class AnticipatoryLearning:
         self.stochastic_pareto_frontiers = []
         self.anticipative_pareto_frontiers = []
         
+        # Epsilon feasibility parameters
+        self.epsilon = 0.05
+        self.ref_point = (0.0, 1.0)  # (ROI_ref, Risk_ref)
+        
+        # Transaction cost parameters
+        self.brokerage_commission = 0.005  # 0.5%
+        self.brokerage_fee = 0.0
+        self.current_wealth = 1.0
+        self.current_investment = None
+    
+    def store_historical_population(self, population: List[Solution]):
+        """Store historical population for decision space learning."""
+        historical_pop = []
+        for solution in population:
+            historical_sol = Solution(num_assets=len(solution.P.investment))
+            historical_sol.P.investment = solution.P.investment.copy()
+            historical_sol.P.ROI = solution.P.ROI
+            historical_sol.P.risk = solution.P.risk
+            historical_sol.alpha = getattr(solution, 'alpha', 0.0)
+            historical_sol.prediction_error = getattr(solution, 'prediction_error', 0.0)
+            historical_pop.append(historical_sol)
+        
+        self.historical_populations.append(historical_pop)
+    
+    def store_anticipative_decision(self, solution: Solution):
+        """Store anticipative decision for historical tracking."""
+        anticipative_sol = Solution(num_assets=len(solution.P.investment))
+        anticipative_sol.P.investment = solution.P.investment.copy()
+        anticipative_sol.P.ROI = solution.P.ROI
+        anticipative_sol.P.risk = solution.P.risk
+        anticipative_sol.alpha = getattr(solution, 'alpha', 0.0)
+        anticipative_sol.prediction_error = getattr(solution, 'prediction_error', 0.0)
+        
+        self.historical_anticipative_decisions.append(anticipative_sol)
+        self.predicted_anticipative_decision = anticipative_sol
+    
+    def compute_anticipatory_learning_rate(self, solution: Solution, min_error: float, 
+                                         max_error: float, min_alpha: float, max_alpha: float, 
+                                         current_time: int) -> float:
+        """
+        Compute anticipatory learning rate using the exact C++ formula.
+        
+        Args:
+            solution: Solution to compute learning rate for
+            min_error: Minimum prediction error in population
+            max_error: Maximum prediction error in population
+            min_alpha: Minimum alpha in population
+            max_alpha: Maximum alpha in population
+            current_time: Current time step
+            
+        Returns:
+            Anticipatory learning rate
+        """
+        # Accuracy factor (aligned with C++ implementation)
+        if min_error > 0.0 and (max_error - min_error) > 0.0:
+            accuracy_factor = 1.0 - (solution.prediction_error - min_error) / (max_error - min_error)
+        else:
+            accuracy_factor = 0.0
+        
+        # Uncertainty factor
+        uncertainty_factor = solution.alpha
+        
+        # Rate bounds (aligned with C++ implementation)
+        if current_time == 0 or self.window_size == 0:
+            rate_upb = 0.0
+            rate_lwb = 0.0
+        else:
+            rate_upb = 0.5
+            rate_lwb = 0.0
+        
+        # Anticipatory learning rate formula (exact C++ implementation)
+        anticipation_rate = (rate_lwb + 
+                           0.5 * uncertainty_factor * (rate_upb - rate_lwb) + 
+                           0.5 * accuracy_factor * (rate_upb - rate_lwb))
+        
+        return anticipation_rate
+    
+    def anticipatory_learning_obj_space(self, solution: Solution, anticipative_portfolio: Solution,
+                                       current_investment: np.ndarray, min_error: float, max_error: float,
+                                       min_alpha: float, max_alpha: float, current_time: int):
+        """
+        Apply anticipatory learning in objective space (aligned with C++ implementation).
+        
+        Args:
+            solution: Solution to update
+            anticipative_portfolio: Anticipative portfolio
+            current_investment: Current investment weights
+            min_error: Minimum prediction error
+            max_error: Maximum prediction error
+            min_alpha: Minimum alpha
+            max_alpha: Maximum alpha
+            current_time: Current time step
+        """
+        if anticipative_portfolio is None:
+            anticipative_portfolio = solution
+        
+        # Update bounds
+        if anticipative_portfolio.prediction_error < min_error:
+            min_error = anticipative_portfolio.prediction_error
+        elif anticipative_portfolio.prediction_error > max_error:
+            max_error = anticipative_portfolio.prediction_error
+        
+        if anticipative_portfolio.alpha < min_alpha:
+            min_alpha = anticipative_portfolio.alpha
+        elif anticipative_portfolio.alpha > max_alpha:
+            max_alpha = anticipative_portfolio.alpha
+        
+        # Compute anticipatory learning rate
+        solution.anticipation_rate = self.compute_anticipatory_learning_rate(
+            anticipative_portfolio, min_error, max_error, min_alpha, max_alpha, current_time
+        )
+        
+        # Update state using anticipatory learning rate
+        x_state = np.array([anticipative_portfolio.P.ROI, anticipative_portfolio.P.risk, 0.0, 0.0])
+        x = x_state.copy()
+        C = anticipative_portfolio.P.kalman_state.P.copy()
+        
+        if self.window_size > 0:
+            # Update state vector
+            x = x_state + solution.anticipation_rate * (anticipative_portfolio.P.kalman_state.x_next - x_state)
+            
+            # Update covariance matrix
+            C = (anticipative_portfolio.P.kalman_state.P + 
+                 solution.anticipation_rate**2 * 
+                 (anticipative_portfolio.P.kalman_state.P_next - anticipative_portfolio.P.kalman_state.P))
+        
+        # Update ROI with transaction cost consideration
+        anticipative_portfolio.P.ROI = x[0]
+        
+        if anticipative_portfolio is not None:
+            # Compute transaction costs (simplified version)
+            cost_current = self.compute_transaction_cost(self.current_investment, solution.P.investment)
+            cost_predicted = self.compute_transaction_cost(current_investment, anticipative_portfolio.P.investment)
+            
+            # Adjust ROI based on transaction costs
+            adjusted_ROI = ((self.current_wealth + cost_current) / self.current_wealth) * anticipative_portfolio.P.ROI
+            nominal_ROI = (self.current_wealth - cost_predicted) * adjusted_ROI
+            anticipative_portfolio.P.ROI = nominal_ROI / self.current_wealth
+        
+        # Update risk (ensure non-negative)
+        if x[1] > 0.0:
+            anticipative_portfolio.P.risk = x[1]
+        elif x[1] < 0.0 and anticipative_portfolio.P.kalman_state.x[1] > 0.0:
+            anticipative_portfolio.P.risk = anticipative_portfolio.P.kalman_state.x[1]
+        else:
+            anticipative_portfolio.P.risk = 0.0
+        
+        # Update covariance
+        anticipative_portfolio.P.kalman_state.P = C
+        solution.P.kalman_state.P = C
+        
+        # Update solution
+        solution.P.kalman_state = anticipative_portfolio.P.kalman_state
+        solution.P.ROI = anticipative_portfolio.P.ROI
+        solution.P.risk = anticipative_portfolio.P.risk
+        
+        # Mark as anticipated
+        solution.anticipation = True
+        anticipative_portfolio.anticipation = True
+    
+    def anticipatory_learning_dec_space(self, population: List[Solution], solution_idx: int, 
+                                       current_time: int) -> Solution:
+        """
+        Apply anticipatory learning in decision space (aligned with C++ implementation).
+        
+        Args:
+            population: Current population
+            solution_idx: Index of solution to update
+            current_time: Current time step
+            
+        Returns:
+            Anticipative solution
+        """
+        if current_time == 0 or self.window_size == 0:
+            return population[solution_idx]
+        
+        initial_t = max(0, current_time - self.window_size)
+        
+        # Get historical solution
+        if initial_t < len(self.historical_populations):
+            w_previous = self.historical_populations[initial_t][solution_idx]
+        else:
+            w_previous = population[solution_idx]
+        
+        # Iterate through time steps
+        for t in range(initial_t + 1, current_time):
+            if t < len(self.historical_populations):
+                w_current = self.historical_populations[t][solution_idx]
+            else:
+                w_current = population[solution_idx]
+            
+            # Compute concentration
+            previous_concentration = getattr(w_previous, 'nominal_ROI', 1.0)
+            current_concentration = getattr(w_current, 'nominal_ROI', 1.0)
+            concentration = previous_concentration + current_concentration
+            
+            # Dirichlet mean prediction
+            w_prediction = self.dirichlet_mean_prediction(w_previous, w_current, t)
+            
+            # Update weights using Dirichlet MAP
+            if t == current_time - 1:
+                w_prediction.P.investment = DirichletPredictor.dirichlet_mean_map_update(
+                    w_prediction.P.investment, population[solution_idx].P.investment, concentration
+                )
+            else:
+                if t + 1 < current_time and t + 1 < len(self.historical_populations):
+                    next_weights = self.historical_populations[t + 1][solution_idx].P.investment
+                else:
+                    next_weights = population[solution_idx].P.investment
+                
+                w_prediction.P.investment = DirichletPredictor.dirichlet_mean_map_update(
+                    w_prediction.P.investment, next_weights, concentration
+                )
+            
+            w_previous = w_prediction
+        
+        # Final prediction
+        w_current = population[solution_idx]
+        w_prediction = self.dirichlet_mean_prediction(w_previous, w_current, current_time)
+        
+        return w_prediction
+    
+    def dirichlet_mean_prediction(self, prev_solution: Solution, current_solution: Solution, 
+                                current_time: int) -> Solution:
+        """
+        Predict solution using Dirichlet mean prediction (aligned with C++ implementation).
+        
+        Args:
+            prev_solution: Previous solution
+            current_solution: Current solution
+            current_time: Current time step
+            
+        Returns:
+            Predicted solution
+        """
+        predicted_solution = Solution(num_assets=len(current_solution.P.investment))
+        predicted_solution.P.investment = current_solution.P.investment.copy()
+        predicted_solution.P.ROI = current_solution.P.ROI
+        predicted_solution.P.risk = current_solution.P.risk
+        
+        # Compute anticipative rate
+        anticipative_rate = 2.0 - self.non_dominance_probability(prev_solution, current_solution)
+        
+        # Predict weights
+        predicted_solution.P.investment = DirichletPredictor.dirichlet_mean_prediction_vec(
+            prev_solution.P.investment, current_solution.P.investment, anticipative_rate
+        )
+        
+        # Observe state
+        initial_t = max(0, current_time - self.window_size)
+        self._observe_state(predicted_solution, initial_t, current_time)
+        
+        # Kalman filter prediction
+        if current_time == getattr(self, 'current_period', current_time):
+            self.kalman_filter.predict(predicted_solution.P.kalman_state, steps=1)
+        
+        return predicted_solution
+    
+    def non_dominance_probability(self, solution1: Solution, solution2: Solution) -> float:
+        """
+        Compute non-dominance probability between two solutions.
+        
+        Args:
+            solution1: First solution
+            solution2: Second solution
+            
+        Returns:
+            Non-dominance probability
+        """
+        # Compute deltas
+        delta1 = np.array([solution1.P.ROI - solution2.P.ROI, solution1.P.risk - solution2.P.risk])
+        delta2 = np.array([solution2.P.ROI - solution1.P.ROI, solution2.P.risk - solution1.P.risk])
+        
+        # Point of interest
+        u = np.array([0.0, 0.0])
+        
+        # Combine covariances
+        covar = solution1.P.kalman_state.P[:2, :2] + solution2.P.kalman_state.P[:2, :2]
+        
+        try:
+            # Cholesky decomposition
+            L = np.linalg.cholesky(covar)
+            L_inv = np.linalg.inv(L)
+            
+            # Transform to standard normal
+            z1 = L_inv @ (u - delta1)
+            z2 = L_inv @ (u - delta2)
+            
+            # Compute probabilities
+            prob1 = normal_cdf(z1, np.eye(2))
+            prob2 = normal_cdf(z2, np.eye(2))
+            
+            return prob1 + prob2
+        except np.linalg.LinAlgError:
+            return 0.5
+    
+    def compute_transaction_cost(self, current_weights: np.ndarray, new_weights: np.ndarray) -> float:
+        """
+        Compute transaction cost for portfolio rebalancing.
+        
+        Args:
+            current_weights: Current portfolio weights
+            new_weights: New portfolio weights
+            
+        Returns:
+            Transaction cost
+        """
+        if current_weights is None:
+            return 0.0
+        
+        # Compute turnover
+        turnover = np.sum(np.abs(new_weights - current_weights))
+        
+        # Transaction cost = commission * turnover + fixed fee
+        transaction_cost = self.brokerage_commission * turnover + self.brokerage_fee
+        
+        return transaction_cost
+    
+    def epsilon_feasibility(self, solution: Solution) -> Tuple[float, float]:
+        """
+        Compute epsilon feasibility probabilities (aligned with C++ implementation).
+        
+        Args:
+            solution: Solution to evaluate
+            
+        Returns:
+            Tuple of (ROI_feasibility, Risk_feasibility)
+        """
+        covar = solution.P.kalman_state.P[:2, :2]
+        
+        try:
+            # Cholesky decomposition
+            L = np.linalg.cholesky(covar)
+            L_inv = np.linalg.inv(L)
+            
+            # Current point
+            zpoint = np.array([solution.P.ROI, solution.P.risk])
+            
+            # Reference points
+            zref_bottom = np.array([self.ref_point[0], 0.0])
+            zref_upper = np.array([0.5, self.ref_point[1]])
+            
+            # Transform to standard normal
+            zref_bottom_transformed = L_inv @ (zref_bottom - zpoint)
+            zref_upper_transformed = L_inv @ (zref_upper - zpoint)
+            
+            # Compute probabilities
+            p1 = 1.0 - normal_cdf(zref_bottom_transformed[0:1], np.eye(1))
+            p2 = normal_cdf(zref_upper_transformed[1:2], np.eye(1))
+            
+            return (p1, p2)
+        except np.linalg.LinAlgError:
+            return (0.5, 0.5)
+    
+    def is_epsilon_feasible(self, solution: Solution) -> bool:
+        """
+        Check if solution is epsilon feasible.
+        
+        Args:
+            solution: Solution to check
+            
+        Returns:
+            True if epsilon feasible
+        """
+        feasibility = self.epsilon_feasibility(solution)
+        return (feasibility[0] >= self.epsilon and feasibility[1] >= self.epsilon)
+    
     def learn_single_solution(self, solution: Solution, current_time: int):
         """
         Apply enhanced anticipatory learning to a single solution.
@@ -146,7 +578,8 @@ class AnticipatoryLearning:
             'prediction_error': prediction_error,
             'state_quality': state_quality,
             'nd_probability': nd_probability,
-            'anticipative_confidence': anticipative_dist.compute_anticipative_confidence()
+            'anticipative_confidence': anticipative_dist.compute_anticipative_confidence(),
+            'epsilon_feasibility': self.epsilon_feasibility(solution)
         })
         
         self.prediction_errors.append(prediction_error)
@@ -161,9 +594,50 @@ class AnticipatoryLearning:
             population: Population of solutions
             current_time: Current time step
         """
+        # Store historical population
+        self.store_historical_population(population)
+        
+        # Compute bounds for learning rate calculation
+        min_error = float('inf')
+        max_error = 0.0
+        min_alpha = 1.0
+        max_alpha = 0.0
+        
         for solution in population:
             if not hasattr(solution, 'anticipation') or not solution.anticipation:
-                self.learn_single_solution(solution, current_time)
+                self._observe_state_1step_ahead(solution, current_time)
+                solution.prediction_error = self._compute_prediction_error(solution, current_time)
+                solution.alpha = 1.0 - self._compute_non_dominance_probability(solution)
+            
+            # Update bounds
+            if solution.alpha < min_alpha:
+                min_alpha = solution.alpha
+            if solution.alpha > max_alpha:
+                max_alpha = solution.alpha
+            if solution.prediction_error < min_error:
+                min_error = solution.prediction_error
+            if solution.prediction_error > max_error:
+                max_error = solution.prediction_error
+        
+        # Apply anticipatory learning to each solution
+        for i, solution in enumerate(population):
+            if not hasattr(solution, 'anticipation') or not solution.anticipation:
+                # Decision space learning
+                if current_time > 0:
+                    anticipative_solution = self.anticipatory_learning_dec_space(population, i, current_time)
+                    
+                    # Objective space learning
+                    self.anticipatory_learning_obj_space(
+                        solution, anticipative_solution, 
+                        self.current_investment if self.current_investment is not None else solution.P.investment,
+                        min_error, max_error, min_alpha, max_alpha, current_time
+                    )
+                else:
+                    self.anticipatory_learning_obj_space(
+                        solution, None, 
+                        self.current_investment if self.current_investment is not None else solution.P.investment,
+                        min_error, max_error, min_alpha, max_alpha, current_time
+                    )
         
         # Store stochastic Pareto frontier for visualization
         self._store_stochastic_pareto_frontier(population, current_time)

@@ -418,4 +418,40 @@ class Portfolio:
         cls.sample_autocorrelation(returns_data, 2 * cls.window_size)
     
     def __repr__(self):
-        return f"Portfolio(ROI={self.ROI:.4f}, risk={self.risk:.4f}, cardinality={self.cardinality:.1f})" 
+        return f"Portfolio(ROI={self.ROI:.4f}, risk={self.risk:.4f}, cardinality={self.cardinality:.1f})"
+
+    @classmethod
+    def evaluate_stability(cls, portfolio: 'Portfolio') -> float:
+        """
+        Evaluate portfolio stability using Kalman filter.
+        
+        Args:
+            portfolio: Portfolio object
+            
+        Returns:
+            Stability measure
+        """
+        if portfolio.kalman_state is None:
+            return 1.0  # Default stability if no Kalman filter
+        
+        # Use prediction error as stability measure
+        # Lower prediction error indicates higher stability
+        prediction_error = np.trace(portfolio.kalman_state.P)
+        stability = 1.0 / (1.0 + prediction_error)
+        
+        return stability
+
+    @classmethod
+    def initialize_kalman_filter(cls, portfolio: 'Portfolio', 
+                               initial_roi: float = 0.0, 
+                               initial_risk: float = 0.0) -> None:
+        """
+        Initialize Kalman filter for portfolio.
+        
+        Args:
+            portfolio: Portfolio object
+            initial_roi: Initial ROI value
+            initial_risk: Initial risk value
+        """
+        from ..algorithms.anticipatory_learning import initialize_portfolio_kalman
+        initialize_portfolio_kalman(portfolio, initial_roi, initial_risk) 

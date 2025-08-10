@@ -143,7 +143,8 @@ def remove_worst_s_metric(solutions: List[Solution], reference_point: Tuple[floa
 def run_sms_emoa_generation(population: List[Solution], 
                            mutation_rate: float = 0.3,
                            tournament_size: int = 2,
-                           reference_point: Tuple[float, float] = (-1.0, 10.0)) -> None:
+                           reference_point: Tuple[float, float] = (-1.0, 10.0),
+                           current_time: int = -1) -> None:
     """
     Run one generation of SMS-EMOA algorithm.
     
@@ -153,6 +154,11 @@ def run_sms_emoa_generation(population: List[Solution],
         tournament_size: Size of tournament for selection
         reference_point: Reference point for hypervolume calculation
     """
+    # Apply anticipatory learning if time step is provided
+    if current_time >= 0:
+        from .anticipatory_learning import apply_anticipatory_learning_to_algorithm
+        apply_anticipatory_learning_to_algorithm(population, current_time, 'sms_emoa')
+    
     # Perform fast non-dominated sorting
     from .nsga2 import fast_non_dominated_sort
     num_classes = fast_non_dominated_sort(population)
@@ -218,7 +224,7 @@ def run_sms_emoa(initial_population: List[Solution],
     population = initial_population.copy()
     
     for generation in range(generations):
-        run_sms_emoa_generation(population, mutation_rate, tournament_size, reference_point)
+        run_sms_emoa_generation(population, mutation_rate, tournament_size, reference_point, generation)
         
         # Optional: Print progress
         if generation % 10 == 0:

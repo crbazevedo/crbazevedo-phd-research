@@ -54,8 +54,12 @@ class Solution:
     
     def evaluate_stability(self):
         """Evaluate solution stability."""
-        # Placeholder implementation - would need to implement based on C++ code
-        self.stability = 1.0
+        # Initialize Kalman filter for the portfolio if not already present
+        if self.P.kalman_state is None:
+            Portfolio.initialize_kalman_filter(self.P, self.P.ROI, self.P.risk)
+        
+        # Evaluate stability using Portfolio method
+        self.stability = Portfolio.evaluate_stability(self.P)
     
     def dominates_without_constraints(self, other: 'Solution') -> bool:
         """

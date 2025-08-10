@@ -170,7 +170,8 @@ def select_next_generation(parent_population: List[Solution],
 def run_nsga2_generation(population: List[Solution],
                         population_size: int,
                         mutation_rate: float = 0.1,
-                        crossover_rate: float = 0.9) -> List[Solution]:
+                        crossover_rate: float = 0.9,
+                        current_time: int = -1) -> List[Solution]:
     """
     Run one generation of NSGA-II.
     
@@ -179,10 +180,16 @@ def run_nsga2_generation(population: List[Solution],
         population_size: Size of the population
         mutation_rate: Probability of mutation
         crossover_rate: Probability of crossover
+        current_time: Current time step for anticipatory learning
     
     Returns:
         New population after one generation
     """
+    # Apply anticipatory learning if time step is provided
+    if current_time >= 0:
+        from .anticipatory_learning import apply_anticipatory_learning_to_algorithm
+        apply_anticipatory_learning_to_algorithm(population, current_time, 'nsga2')
+    
     # Create offspring population
     offspring_population = create_offspring_population(
         population, population_size, crossover_rate, mutation_rate
@@ -225,7 +232,7 @@ def run_nsga2(num_generations: int,
     # Run generations
     for generation in range(num_generations):
         population = run_nsga2_generation(
-            population, population_size, mutation_rate, crossover_rate
+            population, population_size, mutation_rate, crossover_rate, generation
         )
         
         # Optional: Print progress

@@ -39,10 +39,14 @@ class TestSMSEMOA:
         Portfolio.robust_covariance = Portfolio.covariance.copy()  # Add robust covariance
         Portfolio.robustness = False
         
+        # Set up complete returns data for anticipatory learning
+        Portfolio.complete_returns_data = np.random.randn(100, 5) * 0.1  # 100 time steps, 5 assets
+        Portfolio.window_size = 20
+        
         # Create test solutions
         self.solutions = []
         for i in range(10):
-            solution = Solution(5)
+            solution = Solution(5)  # 5 assets
             solution.P.ROI = 0.1 + i * 0.02  # Increasing ROI
             solution.P.risk = 0.2 - i * 0.01  # Decreasing risk
             solution.Pareto_rank = 0 if i < 5 else 1  # First 5 in Pareto front
@@ -248,6 +252,10 @@ class TestSMSEMOAIntegration:
         ])
         Portfolio.robust_covariance = Portfolio.covariance.copy()  # Add robust covariance
         Portfolio.robustness = False
+        
+        # Set up complete returns data for anticipatory learning
+        Portfolio.complete_returns_data = np.random.randn(100, 3) * 0.1  # 100 time steps, 3 assets
+        Portfolio.window_size = 20
     
     def test_sms_emoa_with_portfolio_optimization(self):
         """Test SMS-EMOA with actual portfolio optimization."""

@@ -3,6 +3,7 @@ Metrics Collector Module
 
 Provides comprehensive metrics collection for portfolio optimization experiments
 including portfolio performance, optimization quality, and learning effectiveness.
+Updated to include expected future hypervolume metrics for predictive robustness.
 """
 
 import numpy as np
@@ -34,11 +35,14 @@ class MetricsCollector:
         self.optimization_metrics = {}
         self.learning_metrics = {}
         self.computational_metrics = {}
+        self.future_robustness_metrics = {}  # New: Future robustness metrics
         
         # Time series data
         self.portfolio_returns = []
         self.portfolio_values = []
         self.hypervolume_history = []
+        self.stochastic_hypervolume_history = []
+        self.expected_future_hypervolume_history = []  # New: Expected future hypervolume
         self.pareto_front_history = []
         self.learning_progress = []
         
@@ -105,15 +109,17 @@ class MetricsCollector:
         return metrics
     
     def collect_optimization_metrics(self, population: List, generation: int, 
-                                   pareto_front: List, hypervolume: float) -> Dict[str, Any]:
+                                   pareto_front: List, hypervolume: float,
+                                   expected_future_hypervolume: Optional[float] = None) -> Dict[str, Any]:
         """
-        Collect optimization quality metrics.
+        Collect optimization quality metrics including expected future hypervolume.
         
         Args:
             population: Current population of solutions
             generation: Current generation number
             pareto_front: Current Pareto front
             hypervolume: Current hypervolume
+            expected_future_hypervolume: Expected future hypervolume (if available)
             
         Returns:
             Dictionary of optimization metrics
@@ -121,6 +127,9 @@ class MetricsCollector:
         # Store historical data
         self.hypervolume_history.append(hypervolume)
         self.pareto_front_history.append(pareto_front)
+        
+        if expected_future_hypervolume is not None:
+            self.expected_future_hypervolume_history.append(expected_future_hypervolume)
         
         # Calculate convergence metrics
         convergence_metric = self._calculate_convergence_metric()
@@ -131,14 +140,21 @@ class MetricsCollector:
         solution_quality = self._calculate_solution_quality(population)
         pareto_efficiency = self._calculate_pareto_efficiency(pareto_front)
         
+        # Calculate stochastic Pareto frontier metrics
+        stochastic_quality = self._calculate_stochastic_pareto_quality(population)
+        future_robustness = self._calculate_future_robustness(population, expected_future_hypervolume)
+        
         metrics = {
             'generation': generation,
             'hypervolume': hypervolume,
+            'expected_future_hypervolume': expected_future_hypervolume,
             'convergence_metric': convergence_metric,
             'diversity_metric': diversity_metric,
             'spread_metric': spread_metric,
             'solution_quality': solution_quality,
             'pareto_efficiency': pareto_efficiency,
+            'stochastic_quality': stochastic_quality,
+            'future_robustness': future_robustness,
             'population_size': len(population),
             'pareto_front_size': len(pareto_front)
         }
@@ -147,7 +163,8 @@ class MetricsCollector:
         return metrics
     
     def collect_learning_metrics(self, prediction_error: float, state_quality: float,
-                               learning_progress: float, event_type: str) -> Dict[str, Any]:
+                               learning_progress: float, event_type: str,
+                               alpha: Optional[float] = None, nd_probability: Optional[float] = None) -> Dict[str, Any]:
         """
         Collect anticipatory learning metrics.
         
@@ -156,6 +173,8 @@ class MetricsCollector:
             state_quality: Quality of state observation
             learning_progress: Learning progress indicator
             event_type: Type of learning event
+            alpha: Learning confidence parameter
+            nd_probability: Non-dominance probability
             
         Returns:
             Dictionary of learning metrics
@@ -166,6 +185,8 @@ class MetricsCollector:
             'state_quality': state_quality,
             'learning_progress': learning_progress,
             'event_type': event_type,
+            'alpha': alpha,
+            'nd_probability': nd_probability,
             'timestamp': datetime.now().isoformat()
         })
         
@@ -174,6 +195,17 @@ class MetricsCollector:
         avg_state_quality = np.mean([p['state_quality'] for p in self.learning_progress])
         learning_trend = self._calculate_learning_trend()
         
+        # Calculate anticipatory learning specific metrics
+        if alpha is not None:
+            avg_alpha = np.mean([p['alpha'] for p in self.learning_progress if p['alpha'] is not None])
+        else:
+            avg_alpha = 0.0
+            
+        if nd_probability is not None:
+            avg_nd_probability = np.mean([p['nd_probability'] for p in self.learning_progress if p['nd_probability'] is not None])
+        else:
+            avg_nd_probability = 0.0
+        
         metrics = {
             'prediction_error': prediction_error,
             'state_quality': state_quality,
@@ -181,11 +213,50 @@ class MetricsCollector:
             'avg_prediction_error': avg_prediction_error,
             'avg_state_quality': avg_state_quality,
             'learning_trend': learning_trend,
+            'alpha': alpha,
+            'avg_alpha': avg_alpha,
+            'nd_probability': nd_probability,
+            'avg_nd_probability': avg_nd_probability,
             'event_type': event_type,
             'total_learning_events': len(self.learning_progress)
         }
         
         self.learning_metrics.update(metrics)
+        return metrics
+    
+    def collect_future_robustness_metrics(self, population: List, 
+                                        expected_future_hypervolume: float,
+                                        stochastic_pareto_quality: float) -> Dict[str, Any]:
+        """
+        Collect future robustness metrics for predictive portfolio optimization.
+        
+        Args:
+            population: Current population of solutions
+            expected_future_hypervolume: Expected future hypervolume
+            stochastic_pareto_quality: Quality of stochastic Pareto frontier
+            
+        Returns:
+            Dictionary of future robustness metrics
+        """
+        # Calculate predictive robustness metrics
+        predictive_robustness = self._calculate_predictive_robustness(population, expected_future_hypervolume)
+        future_freedom_of_choice = self._calculate_future_freedom_of_choice(population, expected_future_hypervolume)
+        uncertainty_handling = self._calculate_uncertainty_handling(population)
+        
+        # Calculate stochastic dominance metrics
+        stochastic_dominance_quality = self._calculate_stochastic_dominance_quality(population)
+        
+        metrics = {
+            'expected_future_hypervolume': expected_future_hypervolume,
+            'stochastic_pareto_quality': stochastic_pareto_quality,
+            'predictive_robustness': predictive_robustness,
+            'future_freedom_of_choice': future_freedom_of_choice,
+            'uncertainty_handling': uncertainty_handling,
+            'stochastic_dominance_quality': stochastic_dominance_quality,
+            'hypervolume_robustness_ratio': expected_future_hypervolume / (self.hypervolume_history[-1] + 1e-8) if self.hypervolume_history else 1.0
+        }
+        
+        self.future_robustness_metrics.update(metrics)
         return metrics
     
     def collect_computational_metrics(self, execution_time: float, memory_usage: float,
@@ -213,6 +284,119 @@ class MetricsCollector:
         
         self.computational_metrics.update(metrics)
         return metrics
+    
+    def _calculate_predictive_robustness(self, population: List, expected_future_hypervolume: float) -> float:
+        """Calculate predictive robustness based on expected future hypervolume."""
+        if not self.hypervolume_history:
+            return 0.0
+        
+        current_hypervolume = self.hypervolume_history[-1]
+        
+        # Predictive robustness: ratio of expected future to current hypervolume
+        # Higher ratio indicates better predictive robustness
+        robustness_ratio = expected_future_hypervolume / (current_hypervolume + 1e-8)
+        
+        # Normalize to [0, 1] range
+        predictive_robustness = min(1.0, robustness_ratio)
+        
+        return predictive_robustness
+    
+    def _calculate_future_freedom_of_choice(self, population: List, expected_future_hypervolume: float) -> float:
+        """Calculate future freedom of choice based on expected hypervolume."""
+        if not population:
+            return 0.0
+        
+        # Future freedom of choice: expected hypervolume normalized by population size
+        # Higher values indicate more future options
+        freedom_of_choice = expected_future_hypervolume / len(population)
+        
+        return freedom_of_choice
+    
+    def _calculate_uncertainty_handling(self, population: List) -> float:
+        """Calculate uncertainty handling capability of the population."""
+        if not population:
+            return 0.0
+        
+        # Calculate average prediction error and state quality
+        prediction_errors = []
+        state_qualities = []
+        
+        for solution in population:
+            if hasattr(solution, 'prediction_error'):
+                prediction_errors.append(solution.prediction_error)
+            if hasattr(solution, 'P') and hasattr(solution.P, 'kalman_state'):
+                # State quality based on covariance determinant
+                cov_det = np.linalg.det(solution.P.kalman_state.P[:2, :2])
+                state_quality = 1.0 / (1.0 + cov_det)
+                state_qualities.append(state_quality)
+        
+        # Uncertainty handling: inverse of average prediction error
+        if prediction_errors:
+            avg_prediction_error = np.mean(prediction_errors)
+            uncertainty_handling = 1.0 / (1.0 + avg_prediction_error)
+        else:
+            uncertainty_handling = 0.0
+        
+        return uncertainty_handling
+    
+    def _calculate_stochastic_dominance_quality(self, population: List) -> float:
+        """Calculate stochastic dominance quality of the population."""
+        if not population:
+            return 0.0
+        
+        # Calculate average non-dominance probability
+        nd_probabilities = []
+        
+        for solution in population:
+            if hasattr(solution, 'nd_probability'):
+                nd_probabilities.append(solution.nd_probability)
+        
+        if nd_probabilities:
+            # Higher average non-dominance probability indicates better stochastic dominance
+            stochastic_quality = np.mean(nd_probabilities)
+        else:
+            stochastic_quality = 0.0
+        
+        return stochastic_quality
+    
+    def _calculate_stochastic_pareto_quality(self, population: List) -> float:
+        """Calculate quality of stochastic Pareto frontier."""
+        if not population:
+            return 0.0
+        
+        # Calculate average alpha (learning confidence) and state quality
+        alphas = []
+        state_qualities = []
+        
+        for solution in population:
+            if hasattr(solution, 'alpha'):
+                alphas.append(solution.alpha)
+            if hasattr(solution, 'P') and hasattr(solution.P, 'kalman_state'):
+                # State quality based on covariance determinant
+                cov_det = np.linalg.det(solution.P.kalman_state.P[:2, :2])
+                state_quality = 1.0 / (1.0 + cov_det)
+                state_qualities.append(state_quality)
+        
+        # Stochastic Pareto quality: combination of learning confidence and state quality
+        avg_alpha = np.mean(alphas) if alphas else 0.0
+        avg_state_quality = np.mean(state_qualities) if state_qualities else 0.0
+        
+        stochastic_quality = (avg_alpha + avg_state_quality) / 2.0
+        
+        return stochastic_quality
+    
+    def _calculate_future_robustness(self, population: List, expected_future_hypervolume: Optional[float]) -> float:
+        """Calculate future robustness metric."""
+        if expected_future_hypervolume is None or not self.hypervolume_history:
+            return 0.0
+        
+        current_hypervolume = self.hypervolume_history[-1]
+        
+        # Future robustness: stability of hypervolume under uncertainty
+        # Higher expected future hypervolume relative to current indicates robustness
+        future_robustness = expected_future_hypervolume / (current_hypervolume + 1e-8)
+        
+        return min(1.0, future_robustness)
     
     def _calculate_portfolio_return(self, weights: Dict[str, float], 
                                   asset_returns: pd.DataFrame) -> float:
@@ -451,12 +635,19 @@ class MetricsCollector:
         with open(computational_file, 'w') as f:
             json.dump(self.computational_metrics, f, indent=2)
         
+        # Save future robustness metrics
+        future_robustness_file = self.metrics_dir / "future_robustness_metrics.json"
+        with open(future_robustness_file, 'w') as f:
+            json.dump(self.future_robustness_metrics, f, indent=2)
+        
         # Save time series data
         time_series_file = self.metrics_dir / "time_series_data.json"
         time_series_data = {
             'portfolio_returns': self.portfolio_returns,
             'portfolio_values': self.portfolio_values,
             'hypervolume_history': self.hypervolume_history,
+            'stochastic_hypervolume_history': self.stochastic_hypervolume_history,
+            'expected_future_hypervolume_history': self.expected_future_hypervolume_history,
             'learning_progress': self.learning_progress
         }
         with open(time_series_file, 'w') as f:
@@ -468,7 +659,8 @@ class MetricsCollector:
             'portfolio': self.portfolio_metrics,
             'optimization': self.optimization_metrics,
             'learning': self.learning_metrics,
-            'computational': self.computational_metrics
+            'computational': self.computational_metrics,
+            'future_robustness': self.future_robustness_metrics
         }
     
     def reset(self):
@@ -477,9 +669,12 @@ class MetricsCollector:
         self.optimization_metrics = {}
         self.learning_metrics = {}
         self.computational_metrics = {}
+        self.future_robustness_metrics = {}
         self.portfolio_returns = []
         self.portfolio_values = []
         self.hypervolume_history = []
+        self.stochastic_hypervolume_history = []
+        self.expected_future_hypervolume_history = []
         self.pareto_front_history = []
         self.learning_progress = []
         self.start_time = datetime.now() 

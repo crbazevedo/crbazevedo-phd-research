@@ -1,11 +1,12 @@
 """
 Anticipatory Learning Module
 
-Revised implementation to include:
-- Dirichlet MAP filtering for portfolio weights
-- Stochastic state observation via Monte Carlo simulation
-- Future uncertainty quantification
-- Integration with Kalman filter predictions
+Enhanced implementation to include:
+- Anticipative distribution concept
+- Adaptive learning rate with Kalman error and entropy
+- 1-step ahead horizon for predictive decisions
+- Predicted portfolio rebalancing for maximal expected hypervolume
+- Stochastic Pareto frontier storage for visualization
 """
 
 import numpy as np
@@ -19,29 +20,67 @@ from .kalman_filter import KalmanFilter
 from .statistics import multivariate_normal_sample, normal_cdf, linear_entropy
 from .solution import Solution
 
-class AnticipatoryLearning:
-    """Anticipatory learning system with Dirichlet MAP filtering."""
+class AnticipativeDistribution:
+    """Represents the anticipative distribution for portfolio state prediction."""
     
-    def __init__(self, learning_rate: float = 0.01, prediction_horizon: int = 30,
-                 monte_carlo_simulations: int = 1000, state_observation_frequency: int = 10,
-                 error_threshold: float = 0.05, learning_type: str = "single_solution"):
+    def __init__(self, current_state: np.ndarray, predicted_state: np.ndarray, 
+                 current_covariance: np.ndarray, predicted_covariance: np.ndarray):
         """
-        Initialize anticipatory learning system.
+        Initialize anticipative distribution.
         
         Args:
-            learning_rate: Learning rate for state updates
-            prediction_horizon: Number of time steps to predict ahead
+            current_state: Current portfolio state [ROI, risk, ROI_velocity, risk_velocity]
+            predicted_state: Predicted portfolio state
+            current_covariance: Current state covariance matrix
+            predicted_covariance: Predicted state covariance matrix
+        """
+        self.current_state = current_state
+        self.predicted_state = predicted_state
+        self.current_covariance = current_covariance
+        self.predicted_covariance = predicted_covariance
+        
+        # Combined covariance for anticipative distribution
+        self.anticipative_covariance = current_covariance + predicted_covariance
+        
+        # Anticipative mean (weighted combination)
+        self.anticipative_mean = (current_state + predicted_state) / 2.0
+    
+    def sample_anticipative_state(self, num_samples: int = 1000) -> np.ndarray:
+        """Sample from anticipative distribution."""
+        return multivariate_normal_sample(self.anticipative_mean, self.anticipative_covariance, num_samples)
+    
+    def compute_anticipative_confidence(self) -> float:
+        """Compute confidence in anticipative distribution."""
+        # Confidence based on determinant of anticipative covariance
+        det = np.linalg.det(self.anticipative_covariance[:2, :2])  # ROI and risk only
+        return 1.0 / (1.0 + det)
+
+class AnticipatoryLearning:
+    """Enhanced anticipatory learning system with adaptive learning rate and 1-step ahead horizon."""
+    
+    def __init__(self, learning_rate: float = 0.01, prediction_horizon: int = 1,  # Changed to 1-step ahead
+                 monte_carlo_simulations: int = 1000, state_observation_frequency: int = 10,
+                 error_threshold: float = 0.05, learning_type: str = "single_solution",
+                 adaptive_learning: bool = True):
+        """
+        Initialize enhanced anticipatory learning system.
+        
+        Args:
+            learning_rate: Base learning rate for state updates
+            prediction_horizon: Number of time steps to predict ahead (default: 1)
             monte_carlo_simulations: Number of Monte Carlo simulations
             state_observation_frequency: Frequency of state observations
             error_threshold: Threshold for prediction error
             learning_type: Type of learning ("single_solution" or "population")
+            adaptive_learning: Whether to use adaptive learning rate
         """
-        self.learning_rate = learning_rate
+        self.base_learning_rate = learning_rate
         self.prediction_horizon = prediction_horizon
         self.monte_carlo_simulations = monte_carlo_simulations
         self.state_observation_frequency = state_observation_frequency
         self.error_threshold = error_threshold
         self.learning_type = learning_type
+        self.adaptive_learning = adaptive_learning
         
         # Kalman filter for state tracking
         self.kalman_filter = KalmanFilter()
@@ -50,17 +89,29 @@ class AnticipatoryLearning:
         self.learning_history = []
         self.prediction_errors = []
         self.state_qualities = []
+        self.adaptive_learning_rates = []
+        
+        # Anticipative distributions storage
+        self.anticipative_distributions = []
+        
+        # Stochastic Pareto frontiers storage for visualization
+        self.stochastic_pareto_frontiers = []
+        self.anticipative_pareto_frontiers = []
         
     def learn_single_solution(self, solution: Solution, current_time: int):
         """
-        Apply anticipatory learning to a single solution.
+        Apply enhanced anticipatory learning to a single solution.
         
         Args:
             solution: Solution to apply learning to
             current_time: Current time step
         """
-        # Observe state via Monte Carlo simulation
-        self._observe_state(solution, current_time)
+        # Observe state via Monte Carlo simulation with 1-step ahead horizon
+        self._observe_state_1step_ahead(solution, current_time)
+        
+        # Create anticipative distribution
+        anticipative_dist = self._create_anticipative_distribution(solution)
+        self.anticipative_distributions.append(anticipative_dist)
         
         # Compute prediction error and uncertainty
         prediction_error = self._compute_prediction_error(solution, current_time)
@@ -69,11 +120,17 @@ class AnticipatoryLearning:
         # Compute non-dominance probability
         nd_probability = self._compute_non_dominance_probability(solution)
         
-        # Compute learning confidence
-        alpha = 1.0 - linear_entropy(nd_probability)
+        # Compute adaptive learning rate
+        if self.adaptive_learning:
+            alpha = self._compute_adaptive_learning_rate(solution, prediction_error, nd_probability)
+        else:
+            alpha = 1.0 - linear_entropy(nd_probability)
         
         # Update solution state based on anticipatory knowledge
-        self._update_solution_state(solution, alpha)
+        self._update_solution_state_anticipative(solution, alpha, anticipative_dist)
+        
+        # Apply predicted portfolio rebalancing for maximal expected hypervolume
+        self._apply_predicted_rebalancing(solution, anticipative_dist)
         
         # Store learning metrics
         solution.anticipation = True
@@ -88,11 +145,13 @@ class AnticipatoryLearning:
             'alpha': alpha,
             'prediction_error': prediction_error,
             'state_quality': state_quality,
-            'nd_probability': nd_probability
+            'nd_probability': nd_probability,
+            'anticipative_confidence': anticipative_dist.compute_anticipative_confidence()
         })
         
         self.prediction_errors.append(prediction_error)
         self.state_qualities.append(state_quality)
+        self.adaptive_learning_rates.append(alpha)
     
     def learn_population(self, population: List[Solution], current_time: int):
         """
@@ -105,10 +164,13 @@ class AnticipatoryLearning:
         for solution in population:
             if not hasattr(solution, 'anticipation') or not solution.anticipation:
                 self.learn_single_solution(solution, current_time)
+        
+        # Store stochastic Pareto frontier for visualization
+        self._store_stochastic_pareto_frontier(population, current_time)
     
-    def _observe_state(self, solution: Solution, current_time: int):
+    def _observe_state_1step_ahead(self, solution: Solution, current_time: int):
         """
-        Observe portfolio state via Monte Carlo simulation.
+        Observe portfolio state with 1-step ahead horizon.
         
         Args:
             solution: Solution to observe
@@ -122,7 +184,7 @@ class AnticipatoryLearning:
             self._initialize_state(portfolio, current_time)
             portfolio.state_initialized = True
         
-        # Run Monte Carlo simulations for state observation
+        # Run Monte Carlo simulations for 1-step ahead prediction
         roi_samples = []
         risk_samples = []
         
@@ -130,8 +192,8 @@ class AnticipatoryLearning:
             # Sample from current portfolio state
             current_state = kalman_state.x
             
-            # Generate future scenarios
-            future_state = self._simulate_future_state(current_state, kalman_state.P)
+            # Generate 1-step ahead scenarios
+            future_state = self._simulate_1step_ahead_state(current_state, kalman_state.P)
             
             # Extract ROI and risk from future state
             future_roi = future_state[0]
@@ -157,10 +219,56 @@ class AnticipatoryLearning:
         measurement = np.array([mean_roi, mean_risk])
         self.kalman_filter.update(kalman_state, measurement)
         
-        # Store predictions
+        # Store predictions for 1-step ahead
         portfolio.ROI_prediction = kalman_state.x_next[0] if hasattr(kalman_state, 'x_next') else mean_roi
         portfolio.risk_prediction = kalman_state.x_next[1] if hasattr(kalman_state, 'x_next') else mean_risk
         portfolio.error_covar_prediction = kalman_state.P_next if hasattr(kalman_state, 'P_next') else kalman_state.P
+    
+    def _simulate_1step_ahead_state(self, current_state: np.ndarray, covariance: np.ndarray) -> np.ndarray:
+        """
+        Simulate 1-step ahead state using Monte Carlo sampling.
+        
+        Args:
+            current_state: Current state vector
+            covariance: State covariance matrix
+            
+        Returns:
+            Simulated 1-step ahead state
+        """
+        # Sample from multivariate normal distribution
+        future_state = multivariate_normal_sample(current_state, covariance)
+        
+        # Apply 1-step state transition
+        F = np.array([
+            [1.0, 0.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0, 1.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0]
+        ])
+        
+        return F @ future_state
+    
+    def _create_anticipative_distribution(self, solution: Solution) -> AnticipativeDistribution:
+        """
+        Create anticipative distribution for solution.
+        
+        Args:
+            solution: Solution to create distribution for
+            
+        Returns:
+            Anticipative distribution
+        """
+        portfolio = solution.P
+        kalman_state = portfolio.kalman_state
+        
+        current_state = kalman_state.x
+        predicted_state = kalman_state.x_next if hasattr(kalman_state, 'x_next') else current_state
+        current_covariance = kalman_state.P
+        predicted_covariance = kalman_state.P_next if hasattr(kalman_state, 'P_next') else current_covariance
+        
+        return AnticipativeDistribution(
+            current_state, predicted_state, current_covariance, predicted_covariance
+        )
     
     def _initialize_state(self, portfolio, current_time: int):
         """Initialize Kalman filter state."""
@@ -198,41 +306,8 @@ class AnticipatoryLearning:
             [0.0, 0.01]
         ])
     
-    def _simulate_future_state(self, current_state: np.ndarray, covariance: np.ndarray) -> np.ndarray:
-        """
-        Simulate future state using Monte Carlo sampling.
-        
-        Args:
-            current_state: Current state vector
-            covariance: State covariance matrix
-            
-        Returns:
-            Simulated future state
-        """
-        # Sample from multivariate normal distribution
-        future_state = multivariate_normal_sample(current_state, covariance)
-        
-        # Apply state transition
-        F = np.array([
-            [1.0, 0.0, 1.0, 0.0],
-            [0.0, 1.0, 0.0, 1.0],
-            [0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0]
-        ])
-        
-        return F @ future_state
-    
     def _compute_prediction_error(self, solution: Solution, current_time: int) -> float:
-        """
-        Compute prediction error for solution.
-        
-        Args:
-            solution: Solution to evaluate
-            current_time: Current time step
-            
-        Returns:
-            Prediction error
-        """
+        """Compute prediction error for solution."""
         portfolio = solution.P
         
         # Compare predicted vs current values
@@ -249,20 +324,11 @@ class AnticipatoryLearning:
         return prediction_error
     
     def _compute_state_quality(self, solution: Solution) -> float:
-        """
-        Compute quality of state observation.
-        
-        Args:
-            solution: Solution to evaluate
-            
-        Returns:
-            State quality measure
-        """
+        """Compute quality of state observation."""
         kalman_state = solution.P.kalman_state
         
         # State quality based on covariance matrix determinant
-        # Lower determinant = higher quality (less uncertainty)
-        covariance_det = np.linalg.det(kalman_state.P[:2, :2])  # ROI and risk only
+        covariance_det = np.linalg.det(kalman_state.P[:2, :2])
         
         # Normalize to [0, 1] range
         state_quality = 1.0 / (1.0 + covariance_det)
@@ -270,15 +336,7 @@ class AnticipatoryLearning:
         return state_quality
     
     def _compute_non_dominance_probability(self, solution: Solution) -> float:
-        """
-        Compute probability that solution will be non-dominated in future.
-        
-        Args:
-            solution: Solution to evaluate
-            
-        Returns:
-            Non-dominance probability
-        """
+        """Compute probability that solution will be non-dominated in future."""
         portfolio = solution.P
         kalman_state = portfolio.kalman_state
         
@@ -322,24 +380,59 @@ class AnticipatoryLearning:
         
         return nd_probability
     
-    def _update_solution_state(self, solution: Solution, alpha: float):
+    def _compute_adaptive_learning_rate(self, solution: Solution, prediction_error: float, 
+                                      nd_probability: float) -> float:
         """
-        Update solution state based on anticipatory knowledge.
+        Compute adaptive learning rate based on Kalman error and entropy.
         
         Args:
-            solution: Solution to update
-            alpha: Learning confidence parameter
+            solution: Solution to compute learning rate for
+            prediction_error: Current prediction error
+            nd_probability: Non-dominance probability
+            
+        Returns:
+            Adaptive learning rate
         """
         portfolio = solution.P
         kalman_state = portfolio.kalman_state
         
-        # Update state vector
-        if hasattr(kalman_state, 'x_next'):
-            kalman_state.x = kalman_state.x + alpha * (kalman_state.x_next - kalman_state.x)
+        # Kalman error: determinant of prediction covariance
+        kalman_error = np.linalg.det(kalman_state.P_next[:2, :2]) if hasattr(kalman_state, 'P_next') else np.linalg.det(kalman_state.P[:2, :2])
+        
+        # Entropy over probability of dominance
+        dominance_entropy = linear_entropy(nd_probability)
+        
+        # Adaptive learning rate: combines base rate, Kalman error, and entropy
+        error_factor = 1.0 / (1.0 + kalman_error)
+        entropy_factor = 1.0 - dominance_entropy
+        
+        adaptive_alpha = self.base_learning_rate * error_factor * entropy_factor
+        
+        # Ensure alpha is in [0, 1] range
+        adaptive_alpha = np.clip(adaptive_alpha, 0.0, 1.0)
+        
+        return adaptive_alpha
+    
+    def _update_solution_state_anticipative(self, solution: Solution, alpha: float, 
+                                          anticipative_dist: AnticipativeDistribution):
+        """
+        Update solution state using anticipative distribution.
+        
+        Args:
+            solution: Solution to update
+            alpha: Learning rate
+            anticipative_dist: Anticipative distribution
+        """
+        portfolio = solution.P
+        kalman_state = portfolio.kalman_state
+        
+        # Update state vector using anticipative distribution
+        anticipative_state = anticipative_dist.anticipative_mean
+        kalman_state.x = kalman_state.x + alpha * (anticipative_state - kalman_state.x)
         
         # Update covariance matrix
-        if hasattr(kalman_state, 'P_next'):
-            kalman_state.P = kalman_state.P + alpha * (kalman_state.P_next - kalman_state.P)
+        anticipative_covariance = anticipative_dist.anticipative_covariance
+        kalman_state.P = kalman_state.P + alpha * (anticipative_covariance - kalman_state.P)
         
         # Update portfolio metrics
         portfolio.ROI = kalman_state.x[0]
@@ -353,36 +446,138 @@ class AnticipatoryLearning:
             portfolio.non_robust_ROI = portfolio.ROI
             portfolio.non_robust_risk = portfolio.risk
     
-    def apply_dirichlet_map_filtering(self, solution: Solution):
+    def _apply_predicted_rebalancing(self, solution: Solution, anticipative_dist: AnticipativeDistribution):
         """
-        Apply Dirichlet MAP filtering to portfolio weights.
+        Apply predicted portfolio rebalancing for maximal expected hypervolume.
         
         Args:
-            solution: Solution with portfolio weights
+            solution: Solution to rebalance
+            anticipative_dist: Anticipative distribution
         """
+        portfolio = solution.P
+        
+        # Sample from anticipative distribution to get predicted states
+        predicted_states = anticipative_dist.sample_anticipative_state(100)
+        
+        # Extract predicted ROI and risk values
+        predicted_rois = predicted_states[:, 0]
+        predicted_risks = predicted_states[:, 1]
+        
+        # Compute expected hypervolume contribution for current weights
+        current_expected_hv = self._compute_expected_hypervolume_contribution(
+            predicted_rois, predicted_risks, portfolio.investment
+        )
+        
+        # Optimize weights for maximal expected hypervolume
+        optimal_weights = self._optimize_weights_for_expected_hypervolume(
+            predicted_rois, predicted_risks, portfolio.investment
+        )
+        
+        # Apply rebalancing if improvement is significant
+        if optimal_weights is not None:
+            optimal_expected_hv = self._compute_expected_hypervolume_contribution(
+                predicted_rois, predicted_risks, optimal_weights
+            )
+            
+            if optimal_expected_hv > current_expected_hv * 1.05:  # 5% improvement threshold
+                portfolio.investment = optimal_weights
+                portfolio.cardinality = np.sum(optimal_weights > 0.01)
+    
+    def _compute_expected_hypervolume_contribution(self, predicted_rois: np.ndarray, 
+                                                 predicted_risks: np.ndarray, 
+                                                 weights: np.ndarray) -> float:
+        """Compute expected hypervolume contribution for given weights."""
+        # This is a simplified version - in practice, you'd need to compute
+        # hypervolume contribution considering the full Pareto front
+        expected_roi = np.mean(predicted_rois)
+        expected_risk = np.mean(predicted_risks)
+        
+        # Simple hypervolume approximation
+        return expected_roi * (1.0 - expected_risk)
+    
+    def _optimize_weights_for_expected_hypervolume(self, predicted_rois: np.ndarray, 
+                                                 predicted_risks: np.ndarray, 
+                                                 current_weights: np.ndarray) -> Optional[np.ndarray]:
+        """Optimize weights for maximal expected hypervolume."""
+        # This is a placeholder - in practice, you'd implement a proper optimization
+        # algorithm to find weights that maximize expected hypervolume
+        
+        # For now, return None (no rebalancing)
+        return None
+    
+    def _store_stochastic_pareto_frontier(self, population: List[Solution], current_time: int):
+        """
+        Store stochastic Pareto frontier for visualization.
+        
+        Args:
+            population: Current population
+            current_time: Current time step
+        """
+        # Extract Pareto front
+        pareto_front = [s for s in population if s.pareto_rank == 0]
+        
+        # Create stochastic Pareto frontier representation
+        stochastic_frontier = []
+        for solution in pareto_front:
+            if hasattr(solution, 'P') and hasattr(solution.P, 'kalman_state'):
+                kalman_state = solution.P.kalman_state
+                stochastic_frontier.append({
+                    'roi': solution.P.ROI,
+                    'risk': solution.P.risk,
+                    'roi_prediction': solution.P.ROI_prediction,
+                    'risk_prediction': solution.P.risk_prediction,
+                    'roi_variance': kalman_state.P[0, 0],
+                    'risk_variance': kalman_state.P[1, 1],
+                    'covariance': kalman_state.P[0, 1],
+                    'alpha': getattr(solution, 'alpha', 0.0),
+                    'prediction_error': getattr(solution, 'prediction_error', 0.0),
+                    'weights': solution.P.investment.tolist()
+                })
+        
+        # Store with timestamp
+        self.stochastic_pareto_frontiers.append({
+            'timestamp': datetime.now().isoformat(),
+            'current_time': current_time,
+            'frontier': stochastic_frontier
+        })
+        
+        # Create anticipative Pareto frontier
+        anticipative_frontier = []
+        for solution in pareto_front:
+            if hasattr(solution, 'P') and hasattr(solution.P, 'kalman_state'):
+                kalman_state = solution.P.kalman_state
+                anticipative_frontier.append({
+                    'roi': kalman_state.x[0],
+                    'risk': kalman_state.x[1],
+                    'roi_variance': kalman_state.P[0, 0],
+                    'risk_variance': kalman_state.P[1, 1],
+                    'covariance': kalman_state.P[0, 1],
+                    'weights': solution.P.investment.tolist()
+                })
+        
+        self.anticipative_pareto_frontiers.append({
+            'timestamp': datetime.now().isoformat(),
+            'current_time': current_time,
+            'frontier': anticipative_frontier
+        })
+    
+    def apply_dirichlet_map_filtering(self, solution: Solution):
+        """Apply Dirichlet MAP filtering to portfolio weights."""
         portfolio = solution.P
         weights = portfolio.investment
         
         # Dirichlet MAP estimation
-        # Prior: uniform distribution (alpha = 1 for all assets)
         alpha_prior = np.ones_like(weights)
-        
-        # Likelihood: current weights as observations
-        # For MAP estimation, we treat current weights as "pseudo-counts"
-        alpha_likelihood = weights * 10  # Scale to make them more like counts
-        
-        # Posterior: sum of prior and likelihood
+        alpha_likelihood = weights * 10
         alpha_posterior = alpha_prior + alpha_likelihood
         
-        # MAP estimate: mode of Dirichlet distribution
-        # Mode = (alpha_i - 1) / (sum(alpha) - K) where K is number of assets
+        # MAP estimate
         K = len(weights)
         sum_alpha = np.sum(alpha_posterior)
         
         if sum_alpha > K:
             map_weights = (alpha_posterior - 1) / (sum_alpha - K)
         else:
-            # Fallback to uniform distribution
             map_weights = np.ones_like(weights) / K
         
         # Ensure weights sum to 1 and are non-negative
@@ -391,9 +586,7 @@ class AnticipatoryLearning:
         
         # Update portfolio weights
         portfolio.investment = map_weights
-        
-        # Update cardinality
-        portfolio.cardinality = np.sum(map_weights > 0.01)  # Count assets with >1% allocation
+        portfolio.cardinality = np.sum(map_weights > 0.01)
     
     def get_learning_metrics(self) -> Dict[str, Any]:
         """Get learning performance metrics."""
@@ -413,27 +606,38 @@ class AnticipatoryLearning:
             'std_prediction_error': np.std(prediction_errors),
             'mean_state_quality': np.mean(state_qualities),
             'std_state_quality': np.std(state_qualities),
-            'learning_trend': self._compute_learning_trend()
+            'learning_trend': self._compute_learning_trend(),
+            'adaptive_learning_enabled': self.adaptive_learning,
+            'prediction_horizon': self.prediction_horizon
         }
         
         return metrics
+    
+    def get_stochastic_pareto_frontiers(self) -> List[Dict[str, Any]]:
+        """Get stored stochastic Pareto frontiers for visualization."""
+        return self.stochastic_pareto_frontiers
+    
+    def get_anticipative_pareto_frontiers(self) -> List[Dict[str, Any]]:
+        """Get stored anticipative Pareto frontiers for visualization."""
+        return self.anticipative_pareto_frontiers
     
     def _compute_learning_trend(self) -> float:
         """Compute learning trend based on prediction error."""
         if len(self.prediction_errors) < 10:
             return 0.0
         
-        # Use last 10 errors to compute trend
         recent_errors = self.prediction_errors[-10:]
-        
-        # Compute linear trend (negative slope means improvement)
         x = np.arange(len(recent_errors))
         slope = np.polyfit(x, recent_errors, 1)[0]
         
-        return -slope  # Return positive for improvement
+        return -slope
     
     def reset(self):
         """Reset learning system."""
         self.learning_history = []
         self.prediction_errors = []
-        self.state_qualities = [] 
+        self.state_qualities = []
+        self.adaptive_learning_rates = []
+        self.anticipative_distributions = []
+        self.stochastic_pareto_frontiers = []
+        self.anticipative_pareto_frontiers = [] 

@@ -248,16 +248,17 @@ class Portfolio:
     @classmethod
     def compute_risk(cls, portfolio: 'Portfolio', covariance: np.ndarray) -> float:
         """
-        Compute portfolio risk (variance).
+        Compute portfolio risk (standard deviation).
         
         Args:
             portfolio: Portfolio object
             covariance: Covariance matrix
         
         Returns:
-            Portfolio risk
+            Portfolio risk (standard deviation)
         """
-        return portfolio.investment @ covariance @ portfolio.investment
+        variance = portfolio.investment @ covariance @ portfolio.investment
+        return np.sqrt(max(variance, 0.0))  # Ensure non-negative
     
     @classmethod
     def compute_efficiency(cls, portfolio: 'Portfolio'):

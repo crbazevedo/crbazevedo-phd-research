@@ -417,7 +417,7 @@ class AnticipatoryLearning:
         
         # Observe state
         initial_t = max(0, current_time - self.window_size)
-        self._observe_state(predicted_solution, initial_t, current_time)
+        self._observe_state_1step_ahead(predicted_solution, current_time)
         
         # Kalman filter prediction
         if current_time == getattr(self, 'current_period', current_time):
@@ -532,7 +532,7 @@ class AnticipatoryLearning:
             True if epsilon feasible
         """
         feasibility = self.epsilon_feasibility(solution)
-        return (feasibility[0] >= self.epsilon and feasibility[1] >= self.epsilon)
+        return bool(feasibility[0] >= self.epsilon and feasibility[1] >= self.epsilon)
     
     def learn_single_solution(self, solution: Solution, current_time: int):
         """
@@ -750,6 +750,11 @@ class AnticipatoryLearning:
     
     def _initialize_state(self, portfolio, current_time: int):
         """Initialize Kalman filter state."""
+        # Create Kalman state if it doesn't exist
+        if portfolio.kalman_state is None:
+            from .kalman_filter import create_kalman_params
+            portfolio.kalman_state = create_kalman_params(portfolio.ROI, portfolio.risk)
+        
         kalman_state = portfolio.kalman_state
         
         # Initial state: [ROI, risk, ROI_velocity, risk_velocity]
@@ -1118,4 +1123,7 @@ class AnticipatoryLearning:
         self.adaptive_learning_rates = []
         self.anticipative_distributions = []
         self.stochastic_pareto_frontiers = []
-        self.anticipative_pareto_frontiers = [] 
+        self.anticipative_pareto_frontiers = []
+        self.historical_populations = []
+        self.historical_anticipative_decisions = []
+        self.predicted_anticipative_decision = None 

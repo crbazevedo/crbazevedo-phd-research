@@ -88,6 +88,12 @@ def normal_cdf(z: np.ndarray, Sigma: np.ndarray) -> float:
         Probability P(X <= z)
     """
     try:
+        # Handle 1D case
+        if z.ndim == 1 and len(z) == 1:
+            # For 1D case, use standard normal CDF
+            from scipy.stats import norm
+            return norm.cdf(z[0], loc=0, scale=np.sqrt(Sigma[0, 0]))
+        
         # For 2D case, we can use scipy's multivariate_normal
         if z.shape[0] == 2:
             mvn = multivariate_normal(mean=np.zeros(2), cov=Sigma)
@@ -112,12 +118,22 @@ def _monte_carlo_cdf(z: np.ndarray, Sigma: np.ndarray, num_samples: int = 10000)
     Returns:
         Approximate probability P(X <= z)
     """
+    # Handle 1D case
+    if z.ndim == 1 and len(z) == 1:
+        z = z.reshape(1)
+    
     samples = multi_norm(np.zeros(z.shape[0]), Sigma, num_samples)
     
     # Count samples that satisfy X <= z
     count = 0
     for i in range(num_samples):
-        if np.all(samples[:, i] <= z):
+        # Handle both 1D and 2D sample formats
+        if samples.ndim == 2:
+            sample_i = samples[:, i]
+        else:
+            sample_i = samples[i] if i < len(samples) else samples[0]
+        
+        if np.all(sample_i <= z):
             count += 1
     
     return count / num_samples

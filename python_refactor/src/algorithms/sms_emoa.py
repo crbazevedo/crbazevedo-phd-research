@@ -134,8 +134,11 @@ class SMSEMOA:
         """Initialize population with random solutions."""
         self.population = []
         
+        # Get number of assets from data
+        num_assets = data.get('num_assets', 3)  # Default to 3 if not specified
+        
         for _ in range(self.population_size):
-            solution = Solution(num_assets=len(data.get('assets', [])))
+            solution = Solution(num_assets=num_assets)
             
             # Initialize Kalman filter state
             self._initialize_kalman_state(solution, data)
@@ -187,9 +190,11 @@ class SMSEMOA:
         # Compute portfolio metrics
         portfolio = solution.P
         
-        # Update Kalman filter with current observation
-        measurement = np.array([portfolio.ROI, portfolio.risk])
-        self.kalman_filter.update(solution.P.kalman_state, measurement)
+        # Update Kalman filter with current observation if available
+        if hasattr(solution.P, 'kalman_state') and solution.P.kalman_state is not None:
+            from .kalman_filter import kalman_update
+            measurement = np.array([portfolio.ROI, portfolio.risk])
+            kalman_update(solution.P.kalman_state, measurement)
         
         # Store objectives
         solution.objectives = [portfolio.ROI, portfolio.risk]
@@ -223,6 +228,7 @@ class SMSEMOA:
         parent2_idx = self._tournament_selection()
         
         # Create offspring
+        from .operators import crossover, mutation
         offspring1, offspring2 = crossover(
             self.population[parent1_idx],
             self.population[parent2_idx],
@@ -243,7 +249,7 @@ class SMSEMOA:
         # Update Pareto front
         self._update_pareto_front()
     
-    def _fast_non_dominated_sort(self) -> List[int]:
+    def _fast_non_dominated_sort(self) -> int:
         """Perform fast non-dominated sorting."""
         pareto_ranks = [0] * len(self.population)
         
@@ -255,9 +261,10 @@ class SMSEMOA:
         
         # Assign ranks
         for i, solution in enumerate(self.population):
-            solution.pareto_rank = pareto_ranks[i]
+            solution.Pareto_rank = pareto_ranks[i]
         
-        return pareto_ranks
+        # Return number of fronts (unique ranks)
+        return len(set(pareto_ranks))
     
     def _dominates(self, solution1: Solution, solution2: Solution) -> bool:
         """Check if solution1 dominates solution2."""
@@ -281,7 +288,7 @@ class SMSEMOA:
         # Group solutions by Pareto rank
         pareto_classes = {}
         for solution in self.population:
-            rank = solution.pareto_rank
+            rank = solution.Pareto_rank
             if rank not in pareto_classes:
                 pareto_classes[rank] = []
             pareto_classes[rank].append(solution)
@@ -295,7 +302,7 @@ class SMSEMOA:
         # Group solutions by Pareto rank
         pareto_classes = {}
         for solution in self.population:
-            rank = solution.pareto_rank
+            rank = solution.Pareto_rank
             if rank not in pareto_classes:
                 pareto_classes[rank] = []
             pareto_classes[rank].append(solution)
@@ -414,24 +421,24 @@ class SMSEMOA:
     
     def _remove_worst_solution(self):
         """Remove the solution with the lowest hypervolume contribution."""
-        if len(self.population) <= self.population_size:
-            return
-        
-        # Find worst solution
-        worst_idx = 0
-        worst_contribution = self.population[0].hypervolume_contribution
-        
-        for i, solution in enumerate(self.population):
-            if solution.hypervolume_contribution < worst_contribution:
-                worst_contribution = solution.hypervolume_contribution
-                worst_idx = i
-        
-        # Remove worst solution
-        self.population.pop(worst_idx)
+        # Remove solutions until population size is correct
+        while len(self.population) > self.population_size:
+            # Find worst solution
+            worst_idx = 0
+            worst_contribution = getattr(self.population[0], 'hypervolume_contribution', float('inf'))
+            
+            for i, solution in enumerate(self.population):
+                contribution = getattr(solution, 'hypervolume_contribution', float('inf'))
+                if contribution < worst_contribution:
+                    worst_contribution = contribution
+                    worst_idx = i
+            
+            # Remove worst solution
+            self.population.pop(worst_idx)
     
     def _update_pareto_front(self):
         """Update the Pareto front."""
-        self.pareto_front = [s for s in self.population if s.pareto_rank == 0]
+        self.pareto_front = [s for s in self.population if s.Pareto_rank == 0]
     
     def _track_hypervolume(self):
         """Track hypervolume over generations."""

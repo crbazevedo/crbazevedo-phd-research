@@ -270,9 +270,12 @@ class TestSMSEMOA:
         
         # Create offspring using operators
         from src.algorithms.operators import crossover, mutation
-        offspring = Solution(num_assets=5)
-        crossover(parent1, parent2, offspring)
-        mutation(offspring, self.sms_emoa.mutation_rate)
+        offspring1, offspring2 = crossover(parent1, parent2, self.sms_emoa.crossover_rate)
+        mutation(offspring1, self.sms_emoa.mutation_rate)
+        mutation(offspring2, self.sms_emoa.mutation_rate)
+        
+        # Test offspring1
+        offspring = offspring1
         
         assert offspring is not None
         assert hasattr(offspring, 'P')
@@ -297,9 +300,9 @@ class TestSMSEMOA:
         parent1 = self.sms_emoa.population[0]
         parent2 = self.sms_emoa.population[1]
         from src.algorithms.operators import crossover, mutation
-        offspring = Solution(num_assets=5)
-        crossover(parent1, parent2, offspring)
-        mutation(offspring, self.sms_emoa.mutation_rate)
+        offspring1, offspring2 = crossover(parent1, parent2, self.sms_emoa.crossover_rate)
+        mutation(offspring1, self.sms_emoa.mutation_rate)
+        mutation(offspring2, self.sms_emoa.mutation_rate)
         
         # Perform environmental selection
         self.sms_emoa._remove_worst_solution()

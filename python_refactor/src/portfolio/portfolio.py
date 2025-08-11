@@ -453,5 +453,5 @@ class Portfolio:
             initial_roi: Initial ROI value
             initial_risk: Initial risk value
         """
-        from ..algorithms.anticipatory_learning import initialize_portfolio_kalman
-        initialize_portfolio_kalman(portfolio, initial_roi, initial_risk) 
+        from ..algorithms.kalman_filter import create_kalman_params
+        portfolio.kalman_state = create_kalman_params(initial_roi, initial_risk) 

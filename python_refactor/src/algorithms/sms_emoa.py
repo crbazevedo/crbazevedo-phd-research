@@ -18,8 +18,8 @@ warnings.filterwarnings('ignore')
 from .solution import Solution
 from .operators import crossover, mutation
 from .anticipatory_learning import AnticipatoryLearning
-from .kalman_filter import KalmanFilter
-from .statistics import multivariate_normal_sample, normal_cdf, linear_entropy
+from .kalman_filter import KalmanParams, kalman_filter, kalman_prediction, kalman_update
+from .statistics import multi_norm, normal_cdf, linear_entropy
 
 class StochasticParams:
     """Stochastic parameters for portfolio state tracking."""
@@ -81,7 +81,6 @@ class SMSEMOA:
         
         # Anticipatory learning components
         self.anticipatory_learning = None
-        self.kalman_filter = KalmanFilter()
         
         # Population and Pareto front tracking
         self.population = []

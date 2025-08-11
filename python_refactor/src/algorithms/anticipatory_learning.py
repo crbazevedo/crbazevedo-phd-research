@@ -17,8 +17,8 @@ from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
 
-from .kalman_filter import KalmanFilter
-from .statistics import multivariate_normal_sample, normal_cdf, linear_entropy
+from .kalman_filter import KalmanParams, kalman_filter, kalman_prediction, kalman_update
+from .statistics import multi_norm, normal_cdf, linear_entropy
 from .solution import Solution
 
 class AnticipativeDistribution:
@@ -48,7 +48,7 @@ class AnticipativeDistribution:
     
     def sample_anticipative_state(self, num_samples: int = 1000) -> np.ndarray:
         """Sample from anticipative distribution."""
-        return multivariate_normal_sample(self.anticipative_mean, self.anticipative_covariance, num_samples)
+        return multi_norm(self.anticipative_mean, self.anticipative_covariance, num_samples)
     
     def compute_anticipative_confidence(self) -> float:
         """Compute confidence in anticipative distribution."""
@@ -142,8 +142,12 @@ class AnticipatoryLearning:
         self.adaptive_learning = adaptive_learning
         self.window_size = window_size
         
-        # Kalman filter for state tracking
-        self.kalman_filter = KalmanFilter()
+        # Kalman filter functions for state tracking
+        self.kalman_filter_functions = {
+            'predict': kalman_prediction,
+            'update': kalman_update,
+            'filter': kalman_filter
+        }
         
         # Historical tracking (aligned with C++ implementation)
         self.historical_populations = []
@@ -417,7 +421,7 @@ class AnticipatoryLearning:
         
         # Kalman filter prediction
         if current_time == getattr(self, 'current_period', current_time):
-            self.kalman_filter.predict(predicted_solution.P.kalman_state, steps=1)
+            self.kalman_filter_functions['predict'](predicted_solution.P.kalman_state)
         
         return predicted_solution
     
@@ -691,7 +695,7 @@ class AnticipatoryLearning:
         
         # Update Kalman filter with observed state
         measurement = np.array([mean_roi, mean_risk])
-        self.kalman_filter.update(kalman_state, measurement)
+        self.kalman_filter_functions['update'](kalman_state, measurement)
         
         # Store predictions for 1-step ahead
         portfolio.ROI_prediction = kalman_state.x_next[0] if hasattr(kalman_state, 'x_next') else mean_roi
@@ -710,7 +714,7 @@ class AnticipatoryLearning:
             Simulated 1-step ahead state
         """
         # Sample from multivariate normal distribution
-        future_state = multivariate_normal_sample(current_state, covariance)
+        future_state = multi_norm(current_state, covariance, 1).flatten()
         
         # Apply 1-step state transition
         F = np.array([

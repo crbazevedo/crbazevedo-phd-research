@@ -311,7 +311,9 @@ class TestAnticipatoryLearningIntegration:
         # Initialize Portfolio static variables
         Portfolio.available_assets_size = 3
         Portfolio.mean_ROI = np.array([0.1, 0.15, 0.12])
+        Portfolio.median_ROI = np.array([0.1, 0.15, 0.12])  # Same as mean for simplicity
         Portfolio.covariance = np.eye(3) * 0.1
+        Portfolio.robust_covariance = np.eye(3) * 0.1
         Portfolio.complete_returns_data = np.random.normal(0, 0.1, (50, 3))
         
         self.anticipatory_learning = AnticipatoryLearning()
@@ -330,11 +332,17 @@ class TestAnticipatoryLearningIntegration:
     
     def test_integration_with_portfolio_class(self):
         """Test integration with Portfolio class."""
+        # Create solution first (it will set up Portfolio static variables)
+        solution = Solution(num_assets=3)
+        
+        # Create a new portfolio and assign it
         portfolio = Portfolio(3)
         portfolio.init()
-        
-        solution = Solution(num_assets=3)
         solution.P = portfolio
+        
+        # Initialize Kalman state
+        from src.algorithms.kalman_filter import create_kalman_params
+        solution.P.kalman_state = create_kalman_params(solution.P.ROI, solution.P.risk)
         
         # Should not fail
         self.anticipatory_learning.learn_single_solution(solution, current_time=0)

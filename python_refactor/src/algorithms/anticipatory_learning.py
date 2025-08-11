@@ -997,7 +997,7 @@ class AnticipatoryLearning:
             current_time: Current time step
         """
         # Extract Pareto front
-        pareto_front = [s for s in population if s.pareto_rank == 0]
+        pareto_front = [s for s in population if s.Pareto_rank == 0]
         
         # Create stochastic Pareto frontier representation
         stochastic_frontier = []

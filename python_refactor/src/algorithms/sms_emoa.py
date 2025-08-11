@@ -268,18 +268,25 @@ class SMSEMOA:
     
     def _dominates(self, solution1: Solution, solution2: Solution) -> bool:
         """Check if solution1 dominates solution2."""
-        obj1 = solution1.objectives
-        obj2 = solution2.objectives
+        # Get objectives from portfolio
+        roi1, risk1 = solution1.P.ROI, solution1.P.risk
+        roi2, risk2 = solution2.P.ROI, solution2.P.risk
         
         # Check if solution1 is better in at least one objective
         # and not worse in any objective
         better_in_one = False
         
-        for i in range(len(obj1)):
-            if obj1[i] > obj2[i]:  # Higher ROI is better, lower risk is better
-                better_in_one = True
-            elif obj1[i] < obj2[i]:
-                return False
+        # Higher ROI is better
+        if roi1 > roi2:
+            better_in_one = True
+        elif roi1 < roi2:
+            return False
+        
+        # Lower risk is better
+        if risk1 < risk2:
+            better_in_one = True
+        elif risk1 > risk2:
+            return False
         
         return better_in_one
     
@@ -339,7 +346,7 @@ class SMSEMOA:
                 solution.hypervolume_contribution = (solution.P.ROI - next_solution.P.ROI) * (prev_solution.P.risk - solution.P.risk)
             
             # Apply stability factor
-            solution.hypervolume_contribution *= solution.P.stability
+            solution.hypervolume_contribution *= solution.stability
     
     def _compute_stochastic_hypervolume_contributions_class(self, solutions: List[Solution]):
         """Compute stochastic hypervolume contributions considering uncertainty."""
@@ -355,7 +362,7 @@ class SMSEMOA:
             
             # Expected hypervolume contribution
             solution.hypervolume_contribution = (mean_delta_ROI * var_delta_risk + mean_delta_risk * var_delta_ROI) / (var_delta_ROI + var_delta_risk)
-            solution.hypervolume_contribution *= solution.P.stability
+            solution.hypervolume_contribution *= solution.stability
             return
         
         # Sort by ROI
@@ -400,7 +407,7 @@ class SMSEMOA:
             
             # Expected hypervolume contribution
             solution.hypervolume_contribution = (mean_delta_ROI * var_delta_risk + mean_delta_risk * var_delta_ROI) / (var_delta_ROI + var_delta_risk)
-            solution.hypervolume_contribution *= solution.P.stability
+            solution.hypervolume_contribution *= solution.stability
     
     def _tournament_selection(self) -> int:
         """Perform tournament selection based on hypervolume contribution."""
@@ -485,9 +492,10 @@ class SMSEMOA:
             future_front = []
             for solution in self.pareto_front:
                 # Sample from Kalman filter prediction
-                future_state = self.kalman_filter.predict(solution.P.kalman_state)
-                future_roi = future_state[0]
-                future_risk = future_state[1]
+                from .kalman_filter import kalman_prediction
+                kalman_prediction(solution.P.kalman_state)
+                future_roi = solution.P.kalman_state.x_next[0]
+                future_risk = solution.P.kalman_state.x_next[2]
                 
                 # Create temporary solution for hypervolume computation
                 temp_solution = Solution(num_assets=len(solution.P.investment))

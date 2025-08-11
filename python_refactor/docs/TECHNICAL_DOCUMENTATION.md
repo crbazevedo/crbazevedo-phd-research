@@ -185,12 +185,79 @@ Where:
 - `p_dom` = dominance probability
 - `α₀` = base learning rate
 
+### 3.5 Mathematical Relationships
+
+```mermaid
+graph TB
+    subgraph "State Space"
+        A[State Vector<br/>xₜ = [ROIₜ, Riskₜ, ΔROIₜ, ΔRiskₜ]ᵀ]
+    end
+    
+    subgraph "Prediction"
+        B[Kalman Filter<br/>xₜ₊₁ = Fₜxₜ + wₜ]
+        C[Anticipative Distribution<br/>p(xₜ₊₁|xₜ)]
+    end
+    
+    subgraph "Optimization"
+        D[Portfolio Optimization<br/>min f₁(x) = -E[R(x)]<br/>min f₂(x) = σ(x)]
+        E[Pareto Dominance<br/>∀i: fᵢ(a) ≤ fᵢ(b) ∧ ∃j: fⱼ(a) < fⱼ(b)]
+    end
+    
+    subgraph "Learning"
+        F[Adaptive Learning Rate<br/>αₜ = α₀ × (1+ε_K)⁻¹ × (1-H(p_dom))]
+        G[Solution Update<br/>sₜ₊₁ = sₜ + α(μₐ - sₜ)]
+    end
+    
+    subgraph "Metrics"
+        H[Hypervolume<br/>HV(S, r) = λ(⋃ᵢ [sᵢ, r])]
+        I[Expected Future Hypervolume<br/>E[HV(Sₜ₊₁)]]
+        J[Performance Metrics<br/>Sharpe Ratio, VaR, CVaR]
+    end
+    
+    A --> B
+    B --> C
+    C --> F
+    D --> E
+    E --> F
+    F --> G
+    H --> I
+    G --> J
+    
+    style A fill:#E3F2FD,stroke:#000,stroke-width:2px
+    style J fill:#FFCDD2,stroke:#000,stroke-width:2px
+    style F fill:#E8F5E8,stroke:#000,stroke-width:2px
+```
+
 ---
 
 ## 4. Algorithm Description
 
 ### 4.1 SMS-EMOA Core Algorithm
 
+```mermaid
+flowchart TD
+    A[START: Initialize Population] --> B[Generation t]
+    B --> C[Tournament Selection]
+    B --> D[Crossover & Mutation]
+    B --> E[Evaluate Objectives]
+    C --> D
+    D --> E
+    E --> F[Anticipatory Learning]
+    F --> G[Environmental Selection<br/>Hypervolume-based]
+    G --> H[Update Pareto Front]
+    H --> I[Store Stochastic<br/>Pareto Frontier]
+    I --> J{t < G?}
+    J -->|Yes| B
+    J -->|No| K[Return Pareto Front]
+    
+    style A fill:#4CAF50,stroke:#000,stroke-width:2px,color:#fff
+    style K fill:#F44336,stroke:#000,stroke-width:2px,color:#fff
+    style J fill:#FF9800,stroke:#000,stroke-width:2px,color:#fff
+    style F fill:#9C27B0,stroke:#000,stroke-width:2px,color:#fff
+    style I fill:#9C27B0,stroke:#000,stroke-width:2px,color:#fff
+```
+
+**Pseudocode:**
 ```pseudocode
 Algorithm SMS-EMOA
 Input: Population size N, Generations G, Data D
@@ -210,6 +277,23 @@ Output: Pareto-optimal solutions
 
 ### 4.2 Anticipatory Learning Integration
 
+```mermaid
+flowchart TD
+    A[Solution s, Time t] --> B[Observe Current State<br/>Monte Carlo Simulation]
+    B --> C[Create Anticipative<br/>Distribution Dₐ]
+    C --> D[Compute Prediction<br/>Error ε]
+    D --> E[Calculate Non-dominance<br/>Probability p_nd]
+    E --> F[Compute Adaptive<br/>Learning Rate α]
+    F --> G[Update Solution State<br/>s' = s + α(Dₐ - s)]
+    G --> H[Apply Predicted Rebalancing<br/>for Maximal E[HV]]
+    H --> I[Store Learning Event]
+    
+    style A fill:#E3F2FD,stroke:#000,stroke-width:2px
+    style I fill:#FFCDD2,stroke:#000,stroke-width:2px
+    style F fill:#E8F5E8,stroke:#000,stroke-width:2px
+```
+
+**Pseudocode:**
 ```pseudocode
 Algorithm AnticipatoryLearning
 Input: Solution s, Current time t
@@ -227,6 +311,24 @@ Output: Updated solution s'
 
 ### 4.3 Rolling Horizon Framework
 
+```mermaid
+flowchart TD
+    A[Data Series D] --> B[Period t = 1]
+    B --> C[Extract Training Window<br/>Dₜ = D[t:t+W]]
+    C --> D[Run SMS-EMOA on Dₜ]
+    D --> E[Hold Portfolios<br/>for S periods]
+    E --> F[Evaluate Performance<br/>on Holding Period]
+    F --> G{t < T?}
+    G -->|Yes| H[Update Window<br/>t = t + S]
+    H --> C
+    G -->|No| I[Return Performance Metrics]
+    
+    style A fill:#E3F2FD,stroke:#000,stroke-width:2px
+    style I fill:#F44336,stroke:#000,stroke-width:2px,color:#fff
+    style G fill:#FF9800,stroke:#000,stroke-width:2px,color:#fff
+```
+
+**Pseudocode:**
 ```pseudocode
 Algorithm RollingHorizonOptimization
 Input: Data series D, Window size W, Stride S
@@ -245,7 +347,48 @@ Output: Time series of Pareto fronts
 
 ## 5. Anticipatory Learning Components
 
-### 5.1 State Observation
+### 5.1 Anticipatory Learning Process
+
+```mermaid
+flowchart LR
+    subgraph "Input"
+        A[Current State xₜ]
+    end
+    
+    subgraph "Processing"
+        B[Monte Carlo<br/>Simulation]
+        C[Kalman<br/>Prediction]
+        D[Anticipative<br/>Distribution]
+    end
+    
+    subgraph "Learning"
+        E[Prediction<br/>Error ε]
+        F[Non-dominance<br/>Probability]
+        G[Adaptive<br/>Learning Rate α]
+    end
+    
+    subgraph "Output"
+        H[Solution Update<br/>sₜ₊₁ = sₜ + α(μₐ - sₜ)]
+        I[Learning Event<br/>Log]
+    end
+    
+    A --> B
+    A --> C
+    B --> D
+    C --> D
+    D --> E
+    D --> F
+    E --> G
+    F --> G
+    G --> H
+    H --> I
+    
+    style A fill:#E3F2FD,stroke:#000,stroke-width:2px
+    style I fill:#FFCDD2,stroke:#000,stroke-width:2px
+    style G fill:#E8F5E8,stroke:#000,stroke-width:2px
+```
+
+### 5.2 State Observation
 
 **Monte Carlo Simulation**:
 ```
@@ -290,7 +433,138 @@ subject to: ∑ᵢ wᵢ = 1, wᵢ ≥ 0
 
 ## 6. Implementation Details
 
-### 6.1 Data Structures
+### 6.1 System Architecture
+
+```mermaid
+graph TB
+    subgraph "Data Layer"
+        A1[Market Data<br/>Returns, Prices]
+        A2[Historical Data]
+        A3[Real-time Feeds]
+    end
+    
+    subgraph "Processing Layer"
+        B1[Data Preprocessing]
+        B2[Statistics Computation]
+        B3[Rolling Window]
+    end
+    
+    subgraph "Algorithm Layer"
+        C1[SMS-EMOA Optimizer]
+        C2[Anticipatory Learning]
+        C3[Kalman Filter]
+    end
+    
+    subgraph "Model Layer"
+        D1[Pareto Front]
+        D2[Expected Hypervolume]
+        D3[Predictive Models]
+    end
+    
+    subgraph "Output Layer"
+        E1[Portfolio Weights]
+        E2[Performance Metrics]
+    end
+    
+    A1 --> B1
+    A2 --> B2
+    A3 --> B3
+    B1 --> C1
+    B2 --> C2
+    B3 --> C3
+    C1 --> D1
+    C2 --> D2
+    C3 --> D3
+    D1 --> E1
+    D2 --> E2
+    D3 --> E2
+    
+    style A1 fill:#E3F2FD,stroke:#000,stroke-width:2px
+    style A2 fill:#E3F2FD,stroke:#000,stroke-width:2px
+    style A3 fill:#E3F2FD,stroke:#000,stroke-width:2px
+    style B1 fill:#F3E5F5,stroke:#000,stroke-width:2px
+    style B2 fill:#F3E5F5,stroke:#000,stroke-width:2px
+    style B3 fill:#F3E5F5,stroke:#000,stroke-width:2px
+    style C1 fill:#E8F5E8,stroke:#000,stroke-width:2px
+    style C2 fill:#E8F5E8,stroke:#000,stroke-width:2px
+    style C3 fill:#E8F5E8,stroke:#000,stroke-width:2px
+    style D1 fill:#FFF3E0,stroke:#000,stroke-width:2px
+    style D2 fill:#FFF3E0,stroke:#000,stroke-width:2px
+    style D3 fill:#FFF3E0,stroke:#000,stroke-width:2px
+    style E1 fill:#FFEBEE,stroke:#000,stroke-width:2px
+    style E2 fill:#FFEBEE,stroke:#000,stroke-width:2px
+```
+
+### 6.2 Data Flow
+
+```mermaid
+flowchart LR
+    subgraph "Input Data"
+        A[Market Returns]
+        B[Historical Data]
+    end
+    
+    subgraph "Processing"
+        C[Statistics Computation]
+        D[Rolling Window]
+    end
+    
+    subgraph "Optimization"
+        E[SMS-EMOA]
+        F[Anticipatory Learning]
+    end
+    
+    subgraph "Output"
+        G[Pareto Front]
+        H[Portfolio Weights]
+        I[Performance Metrics]
+    end
+    
+    A --> C
+    B --> D
+    C --> E
+    D --> E
+    E --> F
+    F --> G
+    G --> H
+    G --> I
+    
+    style A fill:#E3F2FD,stroke:#000,stroke-width:2px
+    style I fill:#FFCDD2,stroke:#000,stroke-width:2px
+    style F fill:#E8F5E8,stroke:#000,stroke-width:2px
+```
+
+### 6.3 Component Interaction
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant RH as Rolling Horizon
+    participant SMS as SMS-EMOA
+    participant AL as Anticipatory Learning
+    participant KF as Kalman Filter
+    participant P as Portfolio
+    
+    U->>RH: Start Experiment
+    RH->>SMS: Initialize Population
+    loop For each generation
+        SMS->>SMS: Tournament Selection
+        SMS->>SMS: Crossover & Mutation
+        SMS->>P: Evaluate Objectives
+        SMS->>AL: Apply Learning
+        AL->>KF: Predict State
+        KF-->>AL: Predicted State
+        AL->>AL: Compute Adaptive Alpha
+        AL-->>SMS: Updated Solution
+        SMS->>SMS: Environmental Selection
+        SMS->>SMS: Update Pareto Front
+    end
+    SMS-->>RH: Final Pareto Front
+    RH->>RH: Evaluate Holding Period
+    RH-->>U: Performance Metrics
+```
+
+### 6.4 Data Structures
 
 **Solution Class**:
 ```python
@@ -377,6 +651,25 @@ def compute_adaptive_learning_rate(solution, prediction_error, nd_probability):
 
 ### 7.1 Rolling Horizon Framework
 
+```mermaid
+gantt
+    title Rolling Horizon Timeline
+    dateFormat  YYYY-MM-DD
+    section Period 1
+    Training Window 1    :train1, 2023-08-13, 50d
+    Holding Period 1     :hold1, after train1, 30d
+    section Period 2
+    Training Window 2    :train2, after hold1, 50d
+    Holding Period 2     :hold2, after train2, 30d
+    section Period 3
+    Training Window 3    :train3, after hold2, 50d
+    Holding Period 3     :hold3, after train3, 30d
+    section Period 4
+    Training Window 4    :train4, after hold3, 50d
+    Holding Period 4     :hold4, after train4, 30d
+```
+
+**Timeline Structure:**
 ```
 Timeline: [Training: 50d] [Holding: 30d] [Training: 50d] [Holding: 30d] ...
 Period 1: [Aug 13 - Oct 1] [Oct 2 - Oct 31]

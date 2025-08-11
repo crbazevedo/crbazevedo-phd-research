@@ -36,12 +36,14 @@ This document provides a comprehensive summary of the **Anticipatory SMS-EMOA** 
 - **Results analysis** and validation
 - **Future directions** and research extensions
 
-### 2. **Conceptual Diagrams** (5 High-Quality Visualizations)
-- **Algorithm Flowchart**: Complete SMS-EMOA process flow
-- **System Architecture**: Multi-layer system design
+### 2. **Mermaid Diagrams** (Embedded in Technical Documentation)
+- **Algorithm Flowchart**: Complete SMS-EMOA process flow with color coding
+- **System Architecture**: Multi-layer system design with data flow
 - **Anticipatory Learning Process**: Step-by-step learning mechanism
-- **Rolling Horizon Framework**: Time-evolving optimization approach
-- **Mathematical Relationships**: Interconnections between components
+- **Rolling Horizon Framework**: Gantt chart timeline visualization
+- **Mathematical Relationships**: Component interconnections and formulas
+- **Data Flow**: Input to output processing pipeline
+- **Component Interaction**: Sequence diagram of system interactions
 
 ### 3. **Experimental Results**
 - **Small-Scale Demonstration**: 5-asset portfolio optimization
@@ -121,12 +123,14 @@ This document provides a comprehensive summary of the **Anticipatory SMS-EMOA** 
 
 ## 🎨 **Visualization Suite**
 
-### **Generated Diagrams**
-1. **`algorithm_flowchart.png`** - Complete algorithm process flow
-2. **`system_architecture.png`** - Multi-layer system design
-3. **`anticipatory_learning.png`** - Learning process with mathematical formulas
-4. **`rolling_horizon.png`** - Time-evolving framework visualization
-5. **`mathematical_relationships.png`** - Component interconnections
+### **Mermaid Diagrams** (Embedded in Documentation)
+1. **Algorithm Flowchart** - Complete SMS-EMOA process flow with color coding
+2. **System Architecture** - Multi-layer system design with data flow
+3. **Anticipatory Learning Process** - Step-by-step learning mechanism
+4. **Rolling Horizon Framework** - Gantt chart timeline visualization
+5. **Mathematical Relationships** - Component interconnections and formulas
+6. **Data Flow** - Input to output processing pipeline
+7. **Component Interaction** - Sequence diagram of system interactions
 
 ### **Experimental Visualizations**
 1. **`small_scale_experiment_*.png`** - 6-panel small-scale demonstration
@@ -285,12 +289,8 @@ python_refactor/
 │   │   └── ...
 │   └── portfolio/
 │       └── portfolio.py                    # Portfolio management
-└── Generated Visualizations:
-    ├── algorithm_flowchart.png
-    ├── system_architecture.png
-    ├── anticipatory_learning.png
-    ├── rolling_horizon.png
-    ├── mathematical_relationships.png
+└── Visualizations:
+    ├── Mermaid Diagrams (embedded in docs/TECHNICAL_DOCUMENTATION.md)
     ├── small_scale_experiment_*.png
     └── rolling_horizon_experiment_*.png
 ```

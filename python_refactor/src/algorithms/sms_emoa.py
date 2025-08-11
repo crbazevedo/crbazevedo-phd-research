@@ -411,8 +411,9 @@ class SMSEMOA:
     
     def _tournament_selection(self) -> int:
         """Perform tournament selection based on hypervolume contribution."""
-        # Select random individuals
-        indices = np.random.choice(len(self.population), self.tournament_size, replace=False)
+        # Select random individuals (handle case where tournament_size > population_size)
+        tournament_size = min(self.tournament_size, len(self.population))
+        indices = np.random.choice(len(self.population), tournament_size, replace=False)
         
         # Find the best based on hypervolume contribution
         best_idx = indices[0]

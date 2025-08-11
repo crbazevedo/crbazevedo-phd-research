@@ -406,7 +406,9 @@ class TestSMSEMOAIntegration:
         # Set up portfolio data
         Portfolio.available_assets_size = 3
         Portfolio.mean_ROI = np.array([0.1, 0.15, 0.12])
+        Portfolio.median_ROI = np.array([0.1, 0.15, 0.12])  # Same as mean for simplicity
         Portfolio.covariance = np.eye(3) * 0.1
+        Portfolio.robust_covariance = np.eye(3) * 0.1
         Portfolio.complete_returns_data = np.random.randn(50, 3) * 0.1
         
         self.sms_emoa = SMSEMOA(population_size=5, generations=10)
@@ -415,8 +417,8 @@ class TestSMSEMOAIntegration:
         """Test integration with anticipatory learning."""
         # Create test data
         data = {
-            'num_assets': 5,
-            'returns_data': np.random.randn(100, 5) * 0.1
+            'num_assets': 3,
+            'returns_data': np.random.randn(100, 3) * 0.1
         }
         
         # Run optimization with anticipatory learning
@@ -472,7 +474,9 @@ class TestSMSEMOAEdgeCases:
         """Set up test data."""
         Portfolio.available_assets_size = 2
         Portfolio.mean_ROI = np.array([0.1, 0.15])
+        Portfolio.median_ROI = np.array([0.1, 0.15])  # Same as mean for simplicity
         Portfolio.covariance = np.eye(2) * 0.1
+        Portfolio.robust_covariance = np.eye(2) * 0.1
         Portfolio.complete_returns_data = np.random.randn(20, 2) * 0.1
     
     def test_small_population(self):

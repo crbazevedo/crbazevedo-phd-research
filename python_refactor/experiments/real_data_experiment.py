@@ -22,6 +22,12 @@ from src.algorithms.sms_emoa import SMSEMOA
 from src.portfolio.portfolio import Portfolio
 from src.algorithms.solution import Solution
 
+# Optional import for uncertainty-aware selector (same directory)
+try:
+    from uncertainty_aware_asmsoa import UncertaintyAwareHvDM
+except Exception:
+    UncertaintyAwareHvDM = None
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -205,9 +211,13 @@ class RealDataExperiment:
     - Adaptive learning based on prediction accuracy
     """
     
-    def __init__(self, returns_data):
+    def __init__(self, returns_data, use_uncertainty_hvdm=False, calibrate_uncertainty=False, uncertainty_scale=1.5):
         self.returns_data = returns_data
         self.traditional_benchmarks = TraditionalBenchmarks(returns_data)
+        self.use_uncertainty_hvdm = use_uncertainty_hvdm and (UncertaintyAwareHvDM is not None)
+        self.calibrate_uncertainty = calibrate_uncertainty
+        self.uncertainty_scale = float(uncertainty_scale)
+        self.uncertainty_hv_dm = UncertaintyAwareHvDM() if self.use_uncertainty_hvdm else None
         
     def run_real_data_experiment(self, num_runs=5):
         """Run experiment with real FTSE data"""
@@ -264,6 +274,8 @@ class RealDataExperiment:
         roi_history = []
         anticipative_rates = []
         expected_hv_values = []
+        prediction_accuracy = []
+        uncertainty_coverages = []
         
         current_wealth = 100000.0
         
@@ -309,14 +321,35 @@ class RealDataExperiment:
             
             # Select portfolio using specified decision maker
             if dm_type == 'hv-dm':
-                selected_portfolio = self._select_hv_dm_portfolio(pareto_frontier, k, h)
+                if self.use_uncertainty_hvdm and self.uncertainty_hv_dm is not None:
+                    market_regime = self._detect_market_regime(historical_data)
+                    selection_result = self.uncertainty_hv_dm.select_optimal_portfolio(
+                        pareto_frontier, historical_data, market_regime
+                    )
+                    selected_portfolio = selection_result['selected_portfolio']
+                    expected_hv = selection_result.get('enhanced_hv_score', 0.0)
+                    # Compute uncertainty metrics
+                    metrics = self._calculate_uncertainty_metric(
+                        selection_result.get('uncertainty_predictions', {}),
+                        actual_roi=selected_portfolio.P.ROI,
+                        actual_risk=selected_portfolio.P.risk,
+                        scale=self.uncertainty_scale if self.calibrate_uncertainty else 1.0
+                    )
+                    prediction_accuracy.append(metrics['prediction_accuracy'])
+                    uncertainty_coverages.append(metrics['uncertainty_coverage'])
+                else:
+                    selected_portfolio = self._select_hv_dm_portfolio(pareto_frontier, k, h)
+                    expected_hv = self._calculate_expected_hypervolume(selected_portfolio, k, h)
             elif dm_type == 'r-dm':
                 selected_portfolio = self._select_r_dm_portfolio(pareto_frontier, k, h)
+                expected_hv = self._calculate_expected_hypervolume(selected_portfolio, k, h)
             elif dm_type == 'm-dm':
                 selected_portfolio = self._select_m_dm_portfolio(pareto_frontier, k, h)
+                expected_hv = self._calculate_expected_hypervolume(selected_portfolio, k, h)
             else:
                 # Default to Hv-DM
                 selected_portfolio = self._select_hv_dm_portfolio(pareto_frontier, k, h)
+                expected_hv = self._calculate_expected_hypervolume(selected_portfolio, k, h)
             
             if selected_portfolio is None:
                 continue
@@ -343,10 +376,8 @@ class RealDataExperiment:
             wealth_history.append(new_wealth)
             roi_history.append(period_roi)
             
-            # Calculate anticipative rate and expected hypervolume
+            # Calculate anticipative rate (legacy path) and append expected HV
             anticipative_rate = self._calculate_anticipative_rate(k, h)
-            expected_hv = self._calculate_expected_hypervolume(selected_portfolio, k, h)
-            
             anticipative_rates.append(anticipative_rate)
             expected_hv_values.append(expected_hv)
             
@@ -357,11 +388,15 @@ class RealDataExperiment:
             'roi_history': roi_history,
             'anticipative_rates': anticipative_rates,
             'expected_hv_values': expected_hv_values,
+            'prediction_accuracy': prediction_accuracy,
+            'uncertainty_coverage': uncertainty_coverages,
             'final_wealth': wealth_history[-1] if wealth_history else 100000.0,
             'total_roi': (wealth_history[-1] - 100000.0) / 100000.0 if wealth_history else 0.0,
             'avg_roi_per_period': np.mean(roi_history) if roi_history else 0.0,
             'avg_anticipative_rate': np.mean(anticipative_rates) if anticipative_rates else 0.5,
-            'avg_expected_hv': np.mean(expected_hv_values) if expected_hv_values else 0.0
+            'avg_expected_hv': np.mean(expected_hv_values) if expected_hv_values else 0.0,
+            'avg_prediction_accuracy': np.mean(prediction_accuracy) if prediction_accuracy else np.nan,
+            'avg_uncertainty_coverage': np.mean(uncertainty_coverages) if uncertainty_coverages else np.nan
         }
     
     def _run_traditional_benchmark(self, benchmark_type, historical_days, stride_days, n_periods):
@@ -701,6 +736,38 @@ class RealDataExperiment:
             return 0.0
         
         return -p * np.log(p) - (1 - p) * np.log(1 - p)
+
+    def _detect_market_regime(self, historical_data: pd.DataFrame) -> str:
+        """Simple market regime detector for uncertainty-aware selection"""
+        if len(historical_data) < 30:
+            return 'normal'
+        returns = historical_data.pct_change().dropna()
+        recent_vol = returns.tail(20).std().mean()
+        long_vol = returns.std().mean()
+        vol_ratio = recent_vol / long_vol if long_vol > 0 else 1.0
+        if vol_ratio > 1.5:
+            return 'high_vol'
+        if vol_ratio < 0.7:
+            return 'low_vol'
+        return 'normal'
+
+    def _calculate_uncertainty_metric(self, uncertainty_predictions: dict, actual_roi: float, actual_risk: float, scale: float = 1.0) -> dict:
+        """Compute simple uncertainty metrics for logging and calibration"""
+        mean = np.array(uncertainty_predictions.get('mean', [0.0, 0.0]), dtype=float)
+        std = np.array(uncertainty_predictions.get('uncertainty', [0.05, 0.02]), dtype=float) * float(scale)
+        # 95% bounds
+        roi_lb, roi_ub = mean[0] - 2*std[0], mean[0] + 2*std[0]
+        risk_lb, risk_ub = mean[1] - 2*std[1], mean[1] + 2*std[1]
+        roi_within = (actual_roi >= roi_lb) and (actual_roi <= roi_ub)
+        risk_within = (actual_risk >= risk_lb) and (actual_risk <= risk_ub)
+        coverage = 1.0 if (roi_within and risk_within) else 0.0
+        # Simple accuracy proxy
+        error = abs(mean[0] - actual_roi) + abs(mean[1] - actual_risk)
+        accuracy = 1.0 / (1.0 + error)
+        return {
+            'prediction_accuracy': accuracy,
+            'uncertainty_coverage': coverage
+        }
 
 def create_real_data_visualizations(all_results, save_dir="real_data_results"):
     """Create visualizations for real data experiment"""

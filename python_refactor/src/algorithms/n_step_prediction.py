@@ -38,13 +38,12 @@ class NStepPredictor:
         for step in range(1, h + 1):
             # Predict next state
             F = kalman_state.F  # State transition matrix
-            Q = kalman_state.Q  # Process noise covariance
             
             # State prediction
             predicted_state = F @ current_state
             
-            # Covariance prediction
-            predicted_cov = F @ current_cov @ F.T + Q
+            # Covariance prediction (without process noise Q)
+            predicted_cov = F @ current_cov @ F.T
             
             predictions[f'step_{step}'] = {
                 'state': predicted_state.copy(),

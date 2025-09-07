@@ -24,6 +24,7 @@ from .kalman_filter import KalmanParams, kalman_filter, kalman_prediction, kalma
 from .statistics import multi_norm, normal_cdf, linear_entropy
 from .solution import Solution
 from .temporal_incomparability_probability import TemporalIncomparabilityCalculator
+from .correspondence_mapping import CorrespondenceMapping
 
 class AnticipativeDistribution:
     """Represents the anticipative distribution for portfolio state prediction."""
@@ -157,6 +158,9 @@ class AnticipatoryLearning:
         self.historical_populations = []
         self.historical_anticipative_decisions = []
         self.predicted_anticipative_decision = None
+        
+        # Initialize correspondence mapping
+        self.correspondence_mapping = CorrespondenceMapping(max_history_size=50)
         
         # Learning history
         self.learning_history = []
@@ -362,6 +366,65 @@ class TIPIntegratedAnticipatoryLearning(AnticipatoryLearning):
     def reset_tip_history(self):
         """Reset TIP calculation history."""
         self.tip_calculator.reset_history()
+    
+    def store_population_snapshot(self, population: List[Solution], current_time: int, 
+                                 metadata: Optional[Dict[str, Any]] = None):
+        """
+        Store a population snapshot for correspondence mapping.
+        
+        Args:
+            population: Current population of solutions
+            current_time: Current time step
+            metadata: Optional metadata about the population
+        """
+        self.correspondence_mapping.store_population(population, current_time, metadata)
+        
+        # Also store in historical populations for backward compatibility
+        self.historical_populations.append([sol for sol in population])
+    
+    def get_solution_evolution(self, solution_index: int, start_time: int, 
+                              end_time: int) -> List[Solution]:
+        """
+        Get the evolution of a specific solution across time steps.
+        
+        Args:
+            solution_index: Index of the solution to track
+            start_time: Starting time step
+            end_time: Ending time step
+            
+        Returns:
+            List of solutions representing the evolution
+        """
+        return self.correspondence_mapping.track_solution_evolution(
+            solution_index, start_time, end_time
+        )
+    
+    def find_corresponding_solution(self, target_solution: Solution, target_time: int,
+                                  search_time: int, similarity_threshold: float = 0.95) -> Optional[Solution]:
+        """
+        Find the solution in a different time step that corresponds to the target solution.
+        
+        Args:
+            target_solution: Solution to find correspondence for
+            target_time: Time step of the target solution
+            search_time: Time step to search in
+            similarity_threshold: Minimum similarity threshold for correspondence
+            
+        Returns:
+            Corresponding solution or None if not found
+        """
+        return self.correspondence_mapping.find_corresponding_solution(
+            target_solution, target_time, search_time, similarity_threshold
+        )
+    
+    def get_correspondence_statistics(self) -> Dict[str, Any]:
+        """
+        Get statistics about correspondence mapping.
+        
+        Returns:
+            Dictionary with correspondence mapping statistics
+        """
+        return self.correspondence_mapping.get_history_summary()
     
     def anticipatory_learning_obj_space(self, solution: Solution, anticipative_portfolio: Solution,
                                        current_investment: np.ndarray, min_error: float, max_error: float,

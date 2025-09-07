@@ -15,11 +15,15 @@ import pandas as pd
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 import warnings
+import logging
 warnings.filterwarnings('ignore')
+
+logger = logging.getLogger(__name__)
 
 from .kalman_filter import KalmanParams, kalman_filter, kalman_prediction, kalman_update
 from .statistics import multi_norm, normal_cdf, linear_entropy
 from .solution import Solution
+from .temporal_incomparability_probability import TemporalIncomparabilityCalculator
 
 class AnticipativeDistribution:
     """Represents the anticipative distribution for portfolio state prediction."""
@@ -205,9 +209,13 @@ class AnticipatoryLearning:
     
     def compute_anticipatory_learning_rate(self, solution: Solution, min_error: float, 
                                          max_error: float, min_alpha: float, max_alpha: float, 
-                                         current_time: int) -> float:
+                                         current_time: int, tip_calculator: Optional[TemporalIncomparabilityCalculator] = None,
+                                         predicted_solution: Optional[Solution] = None, horizon: int = 2) -> float:
         """
-        Compute anticipatory learning rate using the exact C++ formula.
+        Compute anticipatory learning rate using TIP integration (Equation 7.16).
+        
+        This implements the enhanced formula that combines TIP and Kalman Filter residuals:
+        λ_{t+h} = (1/2) * (λ^{(H)}_{t+h} + λ^{(K)}_{t+h})
         
         Args:
             solution: Solution to compute learning rate for
@@ -216,9 +224,47 @@ class AnticipatoryLearning:
             min_alpha: Minimum alpha in population
             max_alpha: Maximum alpha in population
             current_time: Current time step
+            tip_calculator: TIP calculator instance
+            predicted_solution: Predicted solution for TIP calculation
+            horizon: Prediction horizon
             
         Returns:
             Anticipatory learning rate
+        """
+        # Traditional learning rate (Kalman Filter based)
+        traditional_rate = self._compute_traditional_learning_rate(
+            solution, min_error, max_error, min_alpha, max_alpha, current_time
+        )
+        
+        # TIP-based learning rate (Equation 6.6)
+        tip_rate = 0.0
+        if tip_calculator is not None and predicted_solution is not None:
+            try:
+                # Calculate TIP
+                tip = tip_calculator.calculate_tip(solution, predicted_solution)
+                
+                # Calculate TIP-based learning rate (Equation 6.6)
+                tip_rate = tip_calculator.calculate_anticipatory_learning_rate_tip(tip, horizon)
+                
+            except Exception as e:
+                logger.warning(f"TIP calculation failed: {e}, using traditional rate only")
+                tip_rate = 0.0
+        
+        # Combined learning rate (Equation 7.16)
+        if tip_rate > 0.0:
+            combined_rate = 0.5 * (traditional_rate + tip_rate)
+        else:
+            combined_rate = traditional_rate
+        
+        return combined_rate
+    
+    def _compute_traditional_learning_rate(self, solution: Solution, min_error: float, 
+                                         max_error: float, min_alpha: float, max_alpha: float, 
+                                         current_time: int) -> float:
+        """
+        Compute traditional anticipatory learning rate using the exact C++ formula.
+        
+        This is the original implementation for backward compatibility.
         """
         # Accuracy factor (aligned with C++ implementation)
         if min_error > 0.0 and (max_error - min_error) > 0.0:
@@ -243,6 +289,79 @@ class AnticipatoryLearning:
                            0.5 * accuracy_factor * (rate_upb - rate_lwb))
         
         return anticipation_rate
+
+
+class TIPIntegratedAnticipatoryLearning(AnticipatoryLearning):
+    """
+    Enhanced Anticipatory Learning with TIP integration.
+    
+    This class extends the base AnticipatoryLearning class to include
+    Temporal Incomparability Probability (TIP) calculation and integration
+    according to the thesis theoretical framework.
+    """
+    
+    def __init__(self, window_size: int = 10, monte_carlo_samples: int = 1000):
+        """
+        Initialize TIP-integrated anticipatory learning.
+        
+        Args:
+            window_size: Window size for historical tracking
+            monte_carlo_samples: Number of Monte Carlo samples for TIP calculation
+        """
+        super().__init__(window_size)
+        self.tip_calculator = TemporalIncomparabilityCalculator(monte_carlo_samples)
+        self.prediction_horizon = 2  # Default prediction horizon
+        
+    def set_prediction_horizon(self, horizon: int):
+        """Set the prediction horizon for TIP calculation."""
+        self.prediction_horizon = horizon
+        
+    def compute_enhanced_anticipatory_learning_rate(self, solution: Solution, 
+                                                  predicted_solution: Solution,
+                                                  min_error: float, max_error: float, 
+                                                  min_alpha: float, max_alpha: float, 
+                                                  current_time: int) -> Tuple[float, float, float]:
+        """
+        Compute enhanced anticipatory learning rate with TIP integration.
+        
+        Returns:
+            Tuple of (combined_rate, traditional_rate, tip_rate)
+        """
+        # Traditional learning rate
+        traditional_rate = self._compute_traditional_learning_rate(
+            solution, min_error, max_error, min_alpha, max_alpha, current_time
+        )
+        
+        # TIP-based learning rate
+        tip_rate = 0.0
+        try:
+            # Calculate TIP
+            tip = self.tip_calculator.calculate_tip(solution, predicted_solution)
+            
+            # Calculate TIP-based learning rate (Equation 6.6)
+            tip_rate = self.tip_calculator.calculate_anticipatory_learning_rate_tip(
+                tip, self.prediction_horizon
+            )
+            
+        except Exception as e:
+            logger.warning(f"TIP calculation failed: {e}, using traditional rate only")
+            tip_rate = 0.0
+        
+        # Combined learning rate (Equation 7.16)
+        if tip_rate > 0.0:
+            combined_rate = 0.5 * (traditional_rate + tip_rate)
+        else:
+            combined_rate = traditional_rate
+        
+        return combined_rate, traditional_rate, tip_rate
+    
+    def get_tip_statistics(self) -> dict:
+        """Get TIP statistics for analysis."""
+        return self.tip_calculator.get_tip_statistics()
+    
+    def reset_tip_history(self):
+        """Reset TIP calculation history."""
+        self.tip_calculator.reset_history()
     
     def anticipatory_learning_obj_space(self, solution: Solution, anticipative_portfolio: Solution,
                                        current_investment: np.ndarray, min_error: float, max_error: float,

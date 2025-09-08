@@ -1,0 +1,211 @@
+{
+  "0": {
+    "h_1": {
+      "Hv-DM": {
+        "final_roi": -0.13756600912404277,
+        "final_wealth": 86243.39908759572,
+        "total_transaction_costs": 2057.4017810635532,
+        "avg_coherence": 0.8747934357625164,
+        "n_periods": 33
+      },
+      "R-DM": {
+        "final_roi": -0.14898894292647266,
+        "final_wealth": 85101.10570735273,
+        "total_transaction_costs": 2127.327480357566,
+        "avg_coherence": 0.8747934357625164,
+        "n_periods": 33
+      },
+      "M-DM": {
+        "final_roi": -0.12697232587173785,
+        "final_wealth": 87302.76741282622,
+        "total_transaction_costs": 1636.0890513351264,
+        "avg_coherence": 0.8747934357625164,
+        "n_periods": 33
+      }
+    },
+    "h_2": {
+      "Hv-DM": {
+        "final_roi": -0.12405363301915116,
+        "final_wealth": 87594.63669808488,
+        "total_transaction_costs": 2158.4057174805416,
+        "avg_coherence": 0.872904287754245,
+        "n_periods": 33
+      },
+      "R-DM": {
+        "final_roi": -0.15083654139739738,
+        "final_wealth": 84916.34586026026,
+        "total_transaction_costs": 2145.9882378003385,
+        "avg_coherence": 0.872904287754245,
+        "n_periods": 33
+      },
+      "M-DM": {
+        "final_roi": -0.13004703998215686,
+        "final_wealth": 86995.29600178431,
+        "total_transaction_costs": 1664.8890362128125,
+        "avg_coherence": 0.872904287754245,
+        "n_periods": 33
+      }
+    }
+  },
+  "1": {
+    "h_1": {
+      "Hv-DM": {
+        "final_roi": -0.14808258925259055,
+        "final_wealth": 85191.74107474094,
+        "total_transaction_costs": 2123.8025480853953,
+        "avg_coherence": 0.8758252551416293,
+        "n_periods": 33
+      },
+      "R-DM": {
+        "final_roi": -0.12249188464694089,
+        "final_wealth": 87750.81153530591,
+        "total_transaction_costs": 2180.260662089457,
+        "avg_coherence": 0.8758252551416293,
+        "n_periods": 33
+      },
+      "M-DM": {
+        "final_roi": -0.1363738689414153,
+        "final_wealth": 86362.61310585847,
+        "total_transaction_costs": 1624.1120283362188,
+        "avg_coherence": 0.8758252551416293,
+        "n_periods": 33
+      }
+    },
+    "h_2": {
+      "Hv-DM": {
+        "final_roi": -0.12593089330957402,
+        "final_wealth": 87406.9106690426,
+        "total_transaction_costs": 2264.0859974821033,
+        "avg_coherence": 0.8722650732875104,
+        "n_periods": 33
+      },
+      "R-DM": {
+        "final_roi": -0.13823698322089534,
+        "final_wealth": 86176.30167791047,
+        "total_transaction_costs": 2029.193349305012,
+        "avg_coherence": 0.8722650732875104,
+        "n_periods": 33
+      },
+      "M-DM": {
+        "final_roi": -0.147724718820884,
+        "final_wealth": 85227.5281179116,
+        "total_transaction_costs": 1582.0791708788731,
+        "avg_coherence": 0.8722650732875104,
+        "n_periods": 33
+      }
+    }
+  },
+  "2": {
+    "h_1": {
+      "Hv-DM": {
+        "final_roi": -0.11971768806210661,
+        "final_wealth": 88028.23119378934,
+        "total_transaction_costs": 2312.006703316084,
+        "avg_coherence": 0.8738397977525086,
+        "n_periods": 33
+      },
+      "R-DM": {
+        "final_roi": -0.12950432294020778,
+        "final_wealth": 87049.56770597922,
+        "total_transaction_costs": 2236.1423953512663,
+        "avg_coherence": 0.8738397977525086,
+        "n_periods": 33
+      },
+      "M-DM": {
+        "final_roi": -0.12630931861037098,
+        "final_wealth": 87369.0681389629,
+        "total_transaction_costs": 1545.654837405446,
+        "avg_coherence": 0.8738397977525086,
+        "n_periods": 33
+      }
+    },
+    "h_2": {
+      "Hv-DM": {
+        "final_roi": -0.0981561668094118,
+        "final_wealth": 90184.38331905882,
+        "total_transaction_costs": 2259.160044847739,
+        "avg_coherence": 0.8721620474533003,
+        "n_periods": 33
+      },
+      "R-DM": {
+        "final_roi": -0.13798027141731872,
+        "final_wealth": 86201.97285826813,
+        "total_transaction_costs": 2187.6188516350635,
+        "avg_coherence": 0.8721620474533003,
+        "n_periods": 33
+      },
+      "M-DM": {
+        "final_roi": -0.12676241226297263,
+        "final_wealth": 87323.75877370274,
+        "total_transaction_costs": 1584.3933511268253,
+        "avg_coherence": 0.8721620474533003,
+        "n_periods": 33
+      }
+    }
+  },
+  "3": {
+    "h_1": {
+      "Hv-DM": {
+        "final_roi": -0.15847126948241072,
+        "final_wealth": 84152.87305175893,
+        "total_transaction_costs": 2217.0246499664363,
+        "avg_coherence": 0.8730471582309031,
+        "n_periods": 33
+      },
+      "R-DM": {
+        "final_roi": -0.12668573168519462,
+        "final_wealth": 87331.42683148054,
+        "total_transaction_costs": 2188.977924295016,
+        "avg_coherence": 0.8730471582309031,
+        "n_periods": 33
+      },
+      "M-DM": {
+        "final_roi": -0.12636093297943124,
+        "final_wealth": 87363.90670205688,
+        "total_transaction_costs": 1619.9724038232594,
+        "avg_coherence": 0.8730471582309031,
+        "n_periods": 33
+      }
+    },
+    "h_2": {
+      "Hv-DM": {
+        "final_roi": -0.14882939854300944,
+        "final_wealth": 85117.06014569906,
+        "total_transaction_costs": 2108.7846138588425,
+        "avg_coherence": 0.8731678309392795,
+        "n_periods": 33
+      },
+      "R-DM": {
+        "final_roi": -0.12799516094846186,
+        "final_wealth": 87200.48390515381,
+        "total_transaction_costs": 2208.856100606978,
+        "avg_coherence": 0.8731678309392795,
+        "n_periods": 33
+      },
+      "M-DM": {
+        "final_roi": -0.14381582957232486,
+        "final_wealth": 85618.41704276751,
+        "total_transaction_costs": 1518.2570178195206,
+        "avg_coherence": 0.8731678309392795,
+        "n_periods": 33
+      }
+    }
+  },
+  "benchmarks": {
+    "index": {
+      "cumulative_return": -0.11017581214432925,
+      "sharpe_ratio": -0.04007396627461015,
+      "volatility": 0.011521103394532212
+    },
+    "sharpe_optimal": {
+      "cumulative_return": -0.93481357387937,
+      "sharpe_ratio": -0.36528986664587054,
+      "volatility": 0.03219012684909435
+    },
+    "min_variance": {
+      "cumulative_return": -0.11470868808486423,
+      "sharpe_ratio": -0.07739703678499625,
+      "volatility": 0.0068203929518481565
+    }
+  }
+}

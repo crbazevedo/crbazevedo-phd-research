@@ -80,13 +80,13 @@ class TestSlidingWindowDirichlet(unittest.TestCase):
         # Test t=K+1 (Equation 6.26)
         u_K_plus_1 = np.array([0.6, 0.1, 0.3])
         
-        # Store the value that will be removed (u_0) before calling update_concentration
-        u_0 = self.model.u_history[0]  # This is u_{t-K-1} = u_0
+        # Store the value that will be removed (the oldest element in the window, u_{t-K-1}) before calling update_concentration
+        u_t_minus_K_minus_1 = self.model.u_history[0]  # This is u_{t-K-1}, the oldest element being removed
         
         alpha_K_plus_1 = self.model.update_concentration(self.window_size + 1, u_K_plus_1)
         
         alpha_K = self.model.alpha_history[-2]
-        expected_alpha_K_plus_1 = alpha_K + self.scaling_factor * u_K_plus_1 - self.scaling_factor * u_0
+        expected_alpha_K_plus_1 = alpha_K + self.scaling_factor * u_K_plus_1 - self.scaling_factor * u_t_minus_K_minus_1
         
         # Apply the same constraint as in the implementation
         expected_alpha_K_plus_1 = np.maximum(expected_alpha_K_plus_1, 1e-10)
